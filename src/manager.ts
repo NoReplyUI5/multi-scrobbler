@@ -126,12 +126,14 @@ class PluginManager {
 
             log(`🎵 Track changed: ${lastTrack.artist} - ${lastTrack.name}`);
 
-            // set up timestamps for the track
+            // set up timestamps for the track - only if duration is available
             let activityTimestamps;
             if (
                 lastTrack.nowPlaying &&
         currentSettings.showTimestamp &&
-        lastTrack.from
+        lastTrack.from &&
+        lastTrack.duration &&
+        lastTrack.duration > 0
             ) {
                 // figure out when this track actually started
                 const now = getCurrentTimestamp();

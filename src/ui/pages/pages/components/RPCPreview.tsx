@@ -8,13 +8,10 @@ export default function RPCPreview() {
     const [previewTrack, setPreviewTrack] = React.useState<any>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [currentProgress, setCurrentProgress] = React.useState(0);
-    const [usingFallback, setUsingFallback] = React.useState(false);
 
-    // Fallback preview data
     const fallbackTrack = {
         name: "Bohemian Rhapsody",
         artist: "Queen",
-        artists: ["Queen"],
         album: "A Night at the Opera",
         image: null,
         nowPlaying: true,
@@ -22,120 +19,106 @@ export default function RPCPreview() {
         startTime: Math.floor(Date.now() / 1000) - 120,
     };
 
-    // Helper function to parse artist data from Last.fm
-    const parseArtists = (artistData: any): string[] => {
-        if (!artistData) return ["Unknown Artist"];
-
-        // Case 1: Already an array of strings
-        if (Array.isArray(artistData)) {
-            return artistData.filter((a) => a && typeof a === "string");
-        }
-
-        // Case 2: Object with "#text" field (Last.fm standard)
-        if (artistData["#text"]) {
-            const artistText = artistData["#text"];
-            // Split by comma, semicolon, or "&" and clean up
-            return artistText
-                .split(/[,;&]/)
-                .map((artist: string) => artist.trim())
-                .filter((artist: string) => artist.length > 0);
-        }
-
-        // Case 3: Plain string
-        if (typeof artistData === "string") {
-            return artistData
-                .split(/[,;&]/)
-                .map((artist: string) => artist.trim())
-                .filter((artist: string) => artist.length > 0);
-        }
-
-        return ["Unknown Artist"];
-    };
-
-    // Helper function to format artists for display
-    const formatArtists = (artists: string[]): string => {
-        if (!artists || artists.length === 0) return "Unknown Artist";
-        if (artists.length === 1) return artists[0];
-        if (artists.length === 2) return `${artists[0]} & ${artists[1]}`;
-        return `${artists.slice(0, -1).join(", ")} & ${artists[artists.length - 1]}`;
-    };
-
     React.useEffect(() => {
         const fetchPreviewData = async () => {
-            if (!getStorage("username") || !getStorage("apiKey")) {
-                // Use fallback if no credentials
+            const username = getStorage("listenbrainzUsername");
+            if (!username) {
                 setPreviewTrack(fallbackTrack);
-                setUsingFallback(true);
                 setIsLoading(false);
                 return;
             }
 
             try {
                 setIsLoading(true);
-                const response = await fetch(
-                    `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${getStorage("username")}&api_key=${getStorage("apiKey")}&format=json&limit=1`,
-                );
-                const data = await response.json();
+                const token = getStorage("listenbrainzToken");
+                const headers: Record<string, string> = {
+                    "Content-Type": "application/json",
+                };
+                if (token) headers["Authorization"] = `Token ${token}`;
 
-                if (
-                    data.recenttracks &&
-          data.recenttracks.track &&
-          data.recenttracks.track.length > 0
-                ) {
-                    const track = data.recenttracks.track[0];
-                    const artists = parseArtists(track.artist);
+                // Try playing now first
+                let trackData: any = null;
+                try {
+                    const playingNowRes = await fetch(
+                        `https://api.listenbrainz.org/1/user/${encodeURIComponent(username)}/playing-now`,
+                        { headers },
+                    );
+                    const playingNowData = await playingNowRes.json();
+                    const listens =
+            playingNowData?.listens ||
+            playingNowData?.payload?.listens ||
+            playingNowData?.data?.listens;
+                    if (listens && listens.length > 0) {
+                        trackData = listens[0];
+                        trackData.playing_now = true;
+                    }
+                } catch (e) {
+                    // ignore
+                }
 
-                    let duration = 180;
-                    try {
-                        const primaryArtist = artists[0] || "Unknown Artist";
-                        const trackInfoResponse = await fetch(
-                            `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${getStorage("apiKey")}&artist=${encodeURIComponent(primaryArtist)}&track=${encodeURIComponent(track.name)}&format=json&u[...]`
-                        );
-                        const trackInfo = await trackInfoResponse.json();
-                        if (trackInfo.track && trackInfo.track.duration) {
-                            duration = Math.floor(trackInfo.track.duration / 1000);
+                // Fallback to recent listens
+                if (!trackData) {
+                    const recentRes = await fetch(
+                        `https://api.listenbrainz.org/1/user/${encodeURIComponent(username)}/listens?count=1`,
+                        { headers },
+                    );
+                    const recentData = await recentRes.json();
+                    const listens =
+            recentData?.listens ||
+            recentData?.payload?.listens ||
+            recentData?.data?.listens;
+                    if (listens && listens.length > 0) {
+                        trackData = listens[0];
+                    }
+                }
+
+                if (trackData) {
+                    const meta = trackData.track_metadata;
+                    const duration = meta.additional_info?.duration_ms
+                        ? Math.floor(meta.additional_info.duration_ms / 1000)
+                        : 180;
+
+                    let image: string | null = null;
+                    if (meta.additional_info?.release_mbid) {
+                        try {
+                            const coverUrl = `https://coverartarchive.org/release/${meta.additional_info.release_mbid}/front`;
+                            const coverRes = await fetch(coverUrl, {
+                                method: "HEAD",
+                                redirect: "follow",
+                            });
+                            if (coverRes.ok) image = coverUrl;
+                        } catch (e) {
+                            // ignore
                         }
-                    } catch (error) {
-                        console.log("Could not fetch track duration, using default");
                     }
 
                     setPreviewTrack({
-                        name: track.name || "Unknown Track",
-                        artist: formatArtists(artists),
-                        artists: artists,
-                        album: track.album?.["#text"] || "Unknown Album",
-                        image:
-              track.image?.[2]?.["#text"] ||
-              track.image?.[1]?.["#text"] ||
-              null,
-                        nowPlaying: track["@attr"]?.nowplaying === "true",
-                        duration: duration,
-                        startTime:
-              track["@attr"]?.nowplaying === "true"
-                  ? Math.floor(Date.now() / 1000) - 60
-                  : null,
+                        name: meta.track_name || "Unknown Track",
+                        artist: meta.artist_name || "Unknown Artist",
+                        album: meta.release_name || "",
+                        image,
+                        nowPlaying: Boolean(trackData.playing_now),
+                        duration,
+                        startTime: trackData.playing_now
+                            ? Math.floor(Date.now() / 1000) - 60
+                            : null,
                     });
-                    setUsingFallback(false);
                 } else {
-                    // No tracks found, use fallback
                     setPreviewTrack(fallbackTrack);
-                    setUsingFallback(true);
                 }
             } catch (error) {
-                console.error("Failed to fetch preview data, using fallback:", error);
-                // Use fallback on error
+                console.error("Failed to fetch ListenBrainz preview:", error);
                 setPreviewTrack(fallbackTrack);
-                setUsingFallback(true);
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchPreviewData();
-    }, [getStorage("username"), getStorage("apiKey")]);
+    }, [getStorage("listenbrainzUsername"), getStorage("listenbrainzToken")]);
 
     React.useEffect(() => {
-        if (!previewTrack?.nowPlaying || !getStorage("showTimestamp")) {
+        if (!previewTrack?.nowPlaying || !previewTrack.duration) {
             return;
         }
 
@@ -149,7 +132,7 @@ export default function RPCPreview() {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [previewTrack, getStorage("showTimestamp")]);
+    }, [previewTrack]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -165,7 +148,7 @@ export default function RPCPreview() {
         }
 
         if (getStorage("showDurationInTooltip") && previewTrack?.duration) {
-            const durationText = ` • ${formatTime(previewTrack.duration)}`;
+            const durationText = ` \u2022 ${formatTime(previewTrack.duration)}`;
             if (text) {
                 text += durationText;
             } else {
@@ -173,7 +156,7 @@ export default function RPCPreview() {
             }
         }
 
-        return text || "No tooltip text";
+        return text || null;
     };
 
     const getCurrentProgressData = () => {
@@ -182,7 +165,7 @@ export default function RPCPreview() {
         if (previewTrack.nowPlaying) {
             const current = currentProgress * previewTrack.duration;
             return {
-                current: current,
+                current,
                 total: previewTrack.duration,
                 progress: currentProgress,
             };
@@ -195,11 +178,11 @@ export default function RPCPreview() {
         }
     };
 
-    // Store getStorage calls with defaults to prevent undefined rendering
     const activityType = getStorage("listeningTo") ? "Listening to" : "Playing";
     const appName = getStorage("appName") || "Music";
     const showLargeText = getStorage("showLargeText", true);
     const showTimestamp = getStorage("showTimestamp", false);
+    const hasDuration = Boolean(previewTrack?.duration);
 
     if (isLoading) {
         return (
@@ -235,17 +218,15 @@ export default function RPCPreview() {
             </RN.View>
 
             <RN.View style={styles.content}>
-                <RN.View style={styles.albumArt}>
-                    {previewTrack.image ? (
+                {previewTrack.image ? (
+                    <RN.View style={styles.albumArt}>
                         <RN.Image
                             source={{ uri: previewTrack.image }}
                             style={styles.albumImage}
                             resizeMode="cover"
                         />
-                    ) : (
-                        <RN.Text style={styles.musicIcon}>🎵</RN.Text>
-                    )}
-                </RN.View>
+                    </RN.View>
+                ) : null}
 
                 <RN.View style={styles.trackInfo}>
                     <RN.Text style={styles.trackName} numberOfLines={1}>
@@ -254,13 +235,13 @@ export default function RPCPreview() {
                     <RN.Text style={styles.artistName} numberOfLines={1}>
                         {previewTrack.artist}
                     </RN.Text>
-                    {showLargeText && previewText !== "No tooltip text" && (
+                    {showLargeText && previewText && (
                         <RN.Text style={styles.tooltipText} numberOfLines={1}>
                             {previewText}
                         </RN.Text>
                     )}
 
-                    {showTimestamp && previewTrack.duration ? (
+                    {showTimestamp && hasDuration ? (
                         <RN.View style={styles.progressContainer}>
                             <RN.Text style={styles.timeText}>
                                 {formatTime(progressData.current)}
@@ -392,10 +373,6 @@ const styles = RN.StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 12,
-    },
-    musicIcon: {
-        color: "#80848e",
-        fontSize: 32,
     },
     trackName: {
         color: "#ffffff",

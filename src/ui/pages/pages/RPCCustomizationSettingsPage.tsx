@@ -76,7 +76,7 @@ export default function RPCCustomizationSettingsPage() {
 
                     <TableCheckboxRow
                         label="Show Timestamp"
-                        subLabel="Display track progress and duration"
+                        subLabel="Display track progress (only shows when duration is available)"
                         checked={showTimestamp}
                         onPress={handleTimestampChange}
                         disabled={!isListeningTo}

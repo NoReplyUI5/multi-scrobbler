@@ -179,14 +179,18 @@ export class ListenBrainzService extends BaseService {
                 }
             }
 
-            // Try to get album art from MusicBrainz or other sources
-            const albumArt: string | null = null;
+            // Try to get album art from Cover Art Archive
+            let albumArt: string | null = null;
             if (latestListen.track_metadata.additional_info?.release_mbid) {
                 try {
-                    // We could fetch cover art from Cover Art Archive, but for now we'll leave it null
-                    // albumArt = `https://coverartarchive.org/release/${latestListen.track_metadata.additional_info.release_mbid}/front`;
+                    const coverUrl = `https://coverartarchive.org/release/${latestListen.track_metadata.additional_info.release_mbid}/front`;
+                    const coverResponse = await fetch(coverUrl, { method: "HEAD", redirect: "follow" });
+                    if (coverResponse.ok) {
+                        albumArt = coverUrl;
+                        this.logVerbose("Found album art from Cover Art Archive");
+                    }
                 } catch (error) {
-                    this.logVerbose("Failed to fetch album art:", error);
+                    this.logVerbose("Failed to fetch album art from Cover Art Archive:", error);
                 }
             }
 
