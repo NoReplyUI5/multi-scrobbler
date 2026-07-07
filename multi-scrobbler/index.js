@@ -99,7 +99,7 @@
       type: "LOCAL_ACTIVITY_UPDATE",
       activity,
       pid: 2312,
-      socketId: "Multi-Scrobbler@Vendetta"
+      socketId: "RPC@Vendetta"
     });
   }
   async function fetchAsset(asset, appId = constants_default.APPLICATION_ID) {
@@ -107,7 +107,7 @@
     try {
       return await AssetManager.fetchAssetIds(appId, asset);
     } catch (error) {
-      console.error("[Multi-Scrobbler] Failed to fetch assets:", error);
+      console.error("[RPC] Failed to fetch assets:", error);
       return [];
     }
   }
@@ -1978,7 +1978,7 @@
     )), /* @__PURE__ */ import_common9.React.createElement(TableRowGroup, { title: "About" }, /* @__PURE__ */ import_common9.React.createElement(
       TableRow,
       {
-        label: "Multi Scrobbler",
+        label: "RPC",
         subLabel: "Show off your music status from multiple services"
       }
     ), /* @__PURE__ */ import_common9.React.createElement(TableRow, { label: "Author", subLabel: "kmmiio99o" }), /* @__PURE__ */ import_common9.React.createElement(TableRow, { label: "Version", subLabel: "1.3.2" }))));
@@ -2070,7 +2070,7 @@
   }
   function patchTabsUI(tabs, patches) {
     if (!settingConstants || !tabsNavigationRef) {
-      console.warn("[Multi Scrobbler] Missing required constants for tabs UI patch");
+      console.warn("[RPC] Missing required constants for tabs UI patch");
       return;
     }
     const row = {
@@ -2162,25 +2162,25 @@
   }
   function patchSidebar() {
     if (!import_vendetta9.plugin.storage.addToSidebar) {
-      console.log("[Multi Scrobbler] Sidebar disabled in settings");
+      console.log("[RPC] Sidebar disabled in settings");
       return () => {
       };
     }
     console.log(
-      "[Multi Scrobbler] Patching sidebar using custom patchSettingsPin..."
+      "[RPC] Patching sidebar using custom patchSettingsPin..."
     );
     try {
       const unpatch = patchSettingsPin({
         key: "MultiScrobbler",
         icon: (0, import_assets4.getAssetIDByName)("MusicIcon"),
-        title: () => "Multi Scrobbler",
+        title: () => "RPC",
         predicate: () => import_vendetta9.plugin.storage.addToSidebar === true,
         page: Settings
       });
-      console.log("[Multi Scrobbler] Successfully patched sidebar");
+      console.log("[RPC] Successfully patched sidebar");
       return unpatch;
     } catch (error) {
-      console.error("[Multi Scrobbler] Failed to patch sidebar:", error);
+      console.error("[RPC] Failed to patch sidebar:", error);
       return () => {
       };
     }
@@ -2215,32 +2215,32 @@
     try {
       await initialize();
       connectionAttempts = 0;
-      console.log("[Multi-Scrobbler] Successfully connected");
+      console.log("[RPC] Successfully connected");
     } catch (error) {
-      console.error("[Multi-Scrobbler] Initialization error:", error);
+      console.error("[RPC] Initialization error:", error);
       connectionAttempts++;
       if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
         console.log(
-          `[Multi-Scrobbler] Retrying connection... (attempt ${connectionAttempts})`
+          `[RPC] Retrying connection... (attempt ${connectionAttempts})`
         );
         setTimeout(tryInitialize, RECONNECT_DELAY);
       } else {
         console.error(
-          "[Multi-Scrobbler] Failed to connect after multiple attempts"
+          "[RPC] Failed to connect after multiple attempts"
         );
       }
     }
   }
   async function validateAndInitialize() {
     if (!currentSettings.service) {
-      console.log("[Multi-Scrobbler] No service selected. Please configure a service in settings.");
+      console.log("[RPC] No service selected. Please configure a service in settings.");
       return;
     }
     let serviceName = "Unknown";
     try {
       serviceName = serviceFactory.getCurrentService().getServiceName();
     } catch (e) {
-      console.error("[Multi-Scrobbler] Failed to determine current service name:", e);
+      console.error("[RPC] Failed to determine current service name:", e);
     }
     const service = currentSettings.service;
     let hasCredentials = false;
@@ -2253,10 +2253,10 @@
         break;
     }
     if (!hasCredentials) {
-      console.error(`[Multi-Scrobbler] Missing credentials for ${serviceName}. Please configure in settings.`);
+      console.error(`[RPC] Missing credentials for ${serviceName}. Please configure in settings.`);
       return;
     }
-    console.log(`[Multi-Scrobbler] Starting with ${serviceName}...`);
+    console.log(`[RPC] Starting with ${serviceName}...`);
     if (UserStore.getCurrentUser()) {
       tryInitialize();
     } else {
@@ -2271,28 +2271,28 @@
   }
   var index_default = {
     onLoad() {
-      console.log("[Multi-Scrobbler] Loading...");
+      console.log("[RPC] Loading...");
       pluginState.pluginStopped = false;
       if (currentSettings.addToSidebar !== false) {
         try {
           sidebarUnpatch = patchSidebar();
-          console.log("[Multi-Scrobbler] Sidebar patched successfully");
+          console.log("[RPC] Sidebar patched successfully");
         } catch (error) {
-          console.error("[Multi-Scrobbler] Failed to patch sidebar:", error);
+          console.error("[RPC] Failed to patch sidebar:", error);
         }
       }
       validateAndInitialize();
     },
     onUnload() {
-      console.log("[Multi-Scrobbler] Unloading...");
+      console.log("[RPC] Unloading...");
       pluginState.pluginStopped = true;
       if (sidebarUnpatch) {
         try {
           sidebarUnpatch();
           sidebarUnpatch = void 0;
-          console.log("[Multi-Scrobbler] Sidebar unpatched");
+          console.log("[RPC] Sidebar unpatched");
         } catch (error) {
-          console.error("[Multi-Scrobbler] Failed to unpatch sidebar:", error);
+          console.error("[RPC] Failed to unpatch sidebar:", error);
         }
       }
       stop();
@@ -2307,43 +2307,43 @@
         if (newSidebar) {
           try {
             sidebarUnpatch = patchSidebar();
-            console.log("[Multi-Scrobbler] Sidebar enabled");
+            console.log("[RPC] Sidebar enabled");
           } catch (error) {
-            console.error("[Multi-Scrobbler] Failed to enable sidebar:", error);
+            console.error("[RPC] Failed to enable sidebar:", error);
           }
         } else {
           if (sidebarUnpatch) {
             try {
               sidebarUnpatch();
             } catch (e) {
-              console.error("[Multi-Scrobbler] Failed to unpatch sidebar:", e);
+              console.error("[RPC] Failed to unpatch sidebar:", e);
             }
             sidebarUnpatch = void 0;
-            console.log("[Multi-Scrobbler] Sidebar disabled");
+            console.log("[RPC] Sidebar disabled");
           }
         }
       }
       if (oldService !== newService && newService) {
-        console.log(`[Multi-Scrobbler] Service changed from ${oldService || "none"} to ${newService}`);
+        console.log(`[RPC] Service changed from ${oldService || "none"} to ${newService}`);
         try {
           await switchService(newService);
         } catch (e) {
-          console.error("[Multi-Scrobbler] Failed to switch service:", e);
+          console.error("[RPC] Failed to switch service:", e);
         }
       } else if (!pluginState.pluginStopped && currentSettings.service) {
         tryInitialize();
       } else if (!currentSettings.service) {
-        console.log("[Multi-Scrobbler] Service unselected, stopping plugin...");
+        console.log("[RPC] Service unselected, stopping plugin...");
         try {
           stop();
         } catch (e) {
-          console.error("[Multi-Scrobbler] Error while stopping due to service unselected:", e);
+          console.error("[RPC] Error while stopping due to service unselected:", e);
         }
       }
     },
     onDiscordReconnect() {
       if (!pluginState.pluginStopped) {
-        console.log("[Multi-Scrobbler] Discord reconnected, reinitializing...");
+        console.log("[RPC] Discord reconnected, reinitializing...");
         tryInitialize();
       }
     },

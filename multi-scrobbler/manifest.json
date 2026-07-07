@@ -1,5 +1,5 @@
 {
-  "name": "Multi Scrobbler",
+  "name": "RPC",
   "description": "Show off your music status from Last.fm or ListenBrainz on your Discord profile with comprehensive console logging.",
   "authors": [
     {
@@ -11,5 +11,5 @@
   "vendetta": {
     "icon": "ic_stage_music"
   },
-  "hash": "e8e91a0e43a5dd61a9b59cafeee222a3d03d3aac3a5cac5659919046914f1830"
+  "hash": "9f95db1afbba1d10b28d6754c3d1c94c5b6330995181c573cfb23e08482cc44a"
 }
