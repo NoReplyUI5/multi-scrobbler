@@ -52,19 +52,19 @@ async function tryInitialize() {
     try {
         await initialize();
         connectionAttempts = 0;
-        console.log("[Multi-Scrobbler] Successfully connected");
+        console.log("[RPC] Successfully connected");
     } catch (error) {
-        console.error("[Multi-Scrobbler] Initialization error:", error);
+        console.error("[RPC] Initialization error:", error);
         connectionAttempts++;
 
         if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
             console.log(
-                `[Multi-Scrobbler] Retrying connection... (attempt ${connectionAttempts})`,
+                `[RPC] Retrying connection... (attempt ${connectionAttempts})`,
             );
             setTimeout(tryInitialize, RECONNECT_DELAY);
         } else {
             console.error(
-                "[Multi-Scrobbler] Failed to connect after multiple attempts",
+                "[RPC] Failed to connect after multiple attempts",
             );
         }
     }
@@ -72,7 +72,7 @@ async function tryInitialize() {
 
 async function validateAndInitialize() {
     if (!currentSettings.service) {
-        console.log("[Multi-Scrobbler] No service selected. Please configure a service in settings.");
+        console.log("[RPC] No service selected. Please configure a service in settings.");
         return;
     }
 
@@ -80,7 +80,7 @@ async function validateAndInitialize() {
     try {
         serviceName = serviceFactory.getCurrentService().getServiceName();
     } catch (e) {
-        console.error("[Multi-Scrobbler] Failed to determine current service name:", e);
+        console.error("[RPC] Failed to determine current service name:", e);
     }
 
     const service = currentSettings.service;
@@ -96,11 +96,11 @@ async function validateAndInitialize() {
     }
 
     if (!hasCredentials) {
-        console.error(`[Multi-Scrobbler] Missing credentials for ${serviceName}. Please configure in settings.`);
+        console.error(`[RPC] Missing credentials for ${serviceName}. Please configure in settings.`);
         return;
     }
 
-    console.log(`[Multi-Scrobbler] Starting with ${serviceName}...`);
+    console.log(`[RPC] Starting with ${serviceName}...`);
 
     if (UserStore.getCurrentUser()) {
         tryInitialize();
@@ -118,16 +118,16 @@ async function validateAndInitialize() {
 
 export default {
     onLoad() {
-        console.log("[Multi-Scrobbler] Loading...");
+        console.log("[RPC] Loading...");
         pluginState.pluginStopped = false;
 
         // Patch sidebar if enabled
         if (currentSettings.addToSidebar !== false) {
             try {
                 sidebarUnpatch = patchSidebar();
-                console.log("[Multi-Scrobbler] Sidebar patched successfully");
+                console.log("[RPC] Sidebar patched successfully");
             } catch (error) {
-                console.error("[Multi-Scrobbler] Failed to patch sidebar:", error);
+                console.error("[RPC] Failed to patch sidebar:", error);
             }
         }
 
@@ -135,7 +135,7 @@ export default {
     },
 
     onUnload() {
-        console.log("[Multi-Scrobbler] Unloading...");
+        console.log("[RPC] Unloading...");
         pluginState.pluginStopped = true;
 
         // Unpatch sidebar
@@ -143,9 +143,9 @@ export default {
             try {
                 sidebarUnpatch();
                 sidebarUnpatch = undefined;
-                console.log("[Multi-Scrobbler] Sidebar unpatched");
+                console.log("[RPC] Sidebar unpatched");
             } catch (error) {
-                console.error("[Multi-Scrobbler] Failed to unpatch sidebar:", error);
+                console.error("[RPC] Failed to unpatch sidebar:", error);
             }
         }
 
@@ -165,45 +165,45 @@ export default {
             if (newSidebar) {
                 try {
                     sidebarUnpatch = patchSidebar();
-                    console.log("[Multi-Scrobbler] Sidebar enabled");
+                    console.log("[RPC] Sidebar enabled");
                 } catch (error) {
-                    console.error("[Multi-Scrobbler] Failed to enable sidebar:", error);
+                    console.error("[RPC] Failed to enable sidebar:", error);
                 }
             } else {
                 if (sidebarUnpatch) {
                     try {
                         sidebarUnpatch();
                     } catch (e) {
-                        console.error("[Multi-Scrobbler] Failed to unpatch sidebar:", e);
+                        console.error("[RPC] Failed to unpatch sidebar:", e);
                     }
                     sidebarUnpatch = undefined;
-                    console.log("[Multi-Scrobbler] Sidebar disabled");
+                    console.log("[RPC] Sidebar disabled");
                 }
             }
         }
 
         if (oldService !== newService && newService) {
-            console.log(`[Multi-Scrobbler] Service changed from ${oldService || "none"} to ${newService}`);
+            console.log(`[RPC] Service changed from ${oldService || "none"} to ${newService}`);
             try {
                 await switchService(newService);
             } catch (e) {
-                console.error("[Multi-Scrobbler] Failed to switch service:", e);
+                console.error("[RPC] Failed to switch service:", e);
             }
         } else if (!pluginState.pluginStopped && currentSettings.service) {
             tryInitialize();
         } else if (!currentSettings.service) {
-            console.log("[Multi-Scrobbler] Service unselected, stopping plugin...");
+            console.log("[RPC] Service unselected, stopping plugin...");
             try {
                 stop();
             } catch (e) {
-                console.error("[Multi-Scrobbler] Error while stopping due to service unselected:", e);
+                console.error("[RPC] Error while stopping due to service unselected:", e);
             }
         }
     },
 
     onDiscordReconnect() {
         if (!pluginState.pluginStopped) {
-            console.log("[Multi-Scrobbler] Discord reconnected, reinitializing...");
+            console.log("[RPC] Discord reconnected, reinitializing...");
             tryInitialize();
         }
     },

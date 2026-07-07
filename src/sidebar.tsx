@@ -98,7 +98,7 @@ function patchPanelUI(tabs, patches) {
 
 function patchTabsUI(tabs, patches) {
     if (!settingConstants || !tabsNavigationRef) {
-        console.warn("[Multi Scrobbler] Missing required constants for tabs UI patch");
+        console.warn("[RPC] Missing required constants for tabs UI patch");
         return;
     }
 
@@ -210,27 +210,27 @@ function patchSettingsPin(tabs) {
 export default function patchSidebar() {
     // Check if sidebar option is enabled in plugin settings
     if (!plugin.storage.addToSidebar) {
-        console.log("[Multi Scrobbler] Sidebar disabled in settings");
+        console.log("[RPC] Sidebar disabled in settings");
         return () => {};
     }
 
     console.log(
-        "[Multi Scrobbler] Patching sidebar using custom patchSettingsPin...",
+        "[RPC] Patching sidebar using custom patchSettingsPin...",
     );
 
     try {
         const unpatch = patchSettingsPin({
             key: "MultiScrobbler",
             icon: getAssetIDByName("MusicIcon"),
-            title: () => "Multi Scrobbler",
+            title: () => "RPC",
             predicate: () => plugin.storage.addToSidebar === true,
             page: Settings,
         });
 
-        console.log("[Multi Scrobbler] Successfully patched sidebar");
+        console.log("[RPC] Successfully patched sidebar");
         return unpatch;
     } catch (error) {
-        console.error("[Multi Scrobbler] Failed to patch sidebar:", error);
+        console.error("[RPC] Failed to patch sidebar:", error);
         return () => {};
     }
 }
