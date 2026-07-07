@@ -209,13 +209,21 @@ class PluginManager {
                 });
             }
 
-            // set up album art and tooltip text - SIMPLIFIED VERSION (no fallback image)
+            // set up album art and tooltip text
             if (lastTrack.album || lastTrack.albumArt) {
-                const assetUrls = lastTrack.albumArt ? [lastTrack.albumArt] : [];
-                const assets = await fetchAsset(assetUrls);
+                let largeImageAsset = lastTrack.albumArt || null;
 
-                // Only use album art if available
-                let largeImageAsset = assets[0];
+                // Try uploading as Discord asset first, fall back to direct URL
+                if (largeImageAsset) {
+                    try {
+                        const assets = await fetchAsset([largeImageAsset]);
+                        if (assets?.[0]) {
+                            largeImageAsset = assets[0];
+                        }
+                    } catch (e) {
+                        // Use the URL directly
+                    }
+                }
 
                 if (largeImageAsset) {
                     activity.assets = {
@@ -233,7 +241,7 @@ class PluginManager {
                         if (currentSettings.showDurationInTooltip && lastTrack.duration) {
                             const durationText = formatDuration(lastTrack.duration);
                             if (largeText) {
-                                largeText += ` • ${durationText}`;
+                                largeText += ` \u2022 ${durationText}`;
                             } else {
                                 largeText = durationText;
                             }
