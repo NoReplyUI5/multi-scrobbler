@@ -1,1 +1,2277 @@
-(function(Y,p,r,x,Pt,D,re,k,R,Q,Qe,ne){"use strict";const b={DEFAULT_APP_NAME:"Music",DEFAULT_TIME_INTERVAL:5,APPLICATION_ID:"1368513179272871956",MIN_UPDATE_INTERVAL:3,LIBREFM_MIN_UPDATE_INTERVAL:60,MAX_RETRY_ATTEMPTS:3,RETRY_DELAY:5e3,SERVICES:{lastfm:{name:"Last.fm",baseUrl:"https://ws.audioscrobbler.com/2.0",requiresApiKey:!0,requiresToken:!1},librefm:{name:"Libre.fm",baseUrl:"https://libre.fm/2.0",requiresApiKey:!0,requiresToken:!1},listenbrainz:{name:"ListenBrainz",baseUrl:"https://api.listenbrainz.org/1",requiresApiKey:!0,requiresToken:!0}},DEFAULT_HEADERS:{},DEFAULT_COVER_HASHES:["2a96cbd8b46e442fc41c2b86b821562f"],DEFAULT_SETTINGS:{username:"",apiKey:"",appName:"Music",timeInterval:5,showTimestamp:!0,listeningTo:!0,showLargeText:!0,ignoreYouTubeMusic:!1,verboseLogging:!1,service:void 0,librefmUsername:"",librefmApiKey:"",listenbrainzUsername:"",listenbrainzToken:""},API_ERROR_CODES:{2:"Invalid service",3:"Invalid method",4:"Invalid format",5:"Invalid parameters",6:"Invalid resource specified",7:"Invalid session key",8:"Invalid API key",9:"Invalid session",10:"Invalid API signature",11:"Service offline",13:"Invalid method signature supplied",16:"Service temporarily unavailable",26:"Suspended API key",29:"Rate limit exceeded"}};function B(e,t){if(!(e instanceof t))throw new TypeError("Cannot call a class as a function")}function be(e,t){for(var n=0;n<t.length;n++){var a=t[n];a.enumerable=a.enumerable||!1,a.configurable=!0,"value"in a&&(a.writable=!0),Object.defineProperty(e,a.key,a)}}function O(e,t,n){return t&&be(e.prototype,t),n&&be(e,n),e}const{SET_ACTIVITY:Nt}=x.findByProps("SET_ACTIVITY"),Je=x.findByProps("getAssetIds"),Ze=x.findByStoreName("SelfPresenceStore"),he=x.findByStoreName("UserStore");function ae(){return ye(null)}function ye(e){E.pluginStopped&&(ue(),e=null),E.lastActivity=e,r.FluxDispatcher.dispatch({type:"LOCAL_ACTIVITY_UPDATE",activity:e,pid:2312,socketId:"RPC@Vendetta"})}async function et(e,t=b.APPLICATION_ID){if(!e?.length)return[];try{return await Je.fetchAssetIds(t,e)}catch(n){return console.error("[RPC] Failed to fetch assets:",n),[]}}const S={};S.componentMountErrors=[],S.componentMountCount=0,S.settingsLoadAttempts=0,S.serviceErrors={lastfm:[],librefm:[],listenbrainz:[]},S.apiCallCount=0,S.connectionAttempts=0,S.lastCredentialValidation={lastfm:!1,librefm:!1,listenbrainz:!1};const J=function(...e){return console.log("[Debug]",...e)},me=function(...e){return console.error("[Debug] Error:",...e)};function G(e,t){S[e]=t,e==="lastError"&&t?me("Error recorded:",t.message):e==="lastTrack"&&t?J("Track updated:",`${t.artist} - ${t.name}`):e==="currentService"&&t&&J("Service changed to:",t)}function ve(){S.apiCallCount=(S.apiCallCount||0)+1,J(`API call count: ${S.apiCallCount}`)}function Z(e,t){S.serviceErrors=S.serviceErrors||{lastfm:[],librefm:[],listenbrainz:[]},S.serviceErrors[e]=S.serviceErrors[e]||[],S.serviceErrors[e].push(`${new Date().toISOString()}: ${t}`),S.serviceErrors[e].length>10&&(S.serviceErrors[e]=S.serviceErrors[e].slice(-10)),me(`${e} error:`,t)}function we(){S.lastSuccessfulUpdate=new Date().toISOString(),J("Successful update recorded at:",S.lastSuccessfulUpdate)}function ee(e){return ee=Object.setPrototypeOf?Object.getPrototypeOf:function(n){return n.__proto__||Object.getPrototypeOf(n)},ee(e)}function Re(){try{var e=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch{}return(Re=function(){return!!e})()}function tt(e){if(e===void 0)throw new ReferenceError("this hasn't been initialised - super() hasn't been called");return e}function rt(e){"@swc/helpers - typeof";return e&&typeof Symbol<"u"&&e.constructor===Symbol?"symbol":typeof e}function nt(e,t){return t&&(rt(t)==="object"||typeof t=="function")?t:tt(e)}function ie(e,t,n){return t=ee(t),nt(e,Re()?Reflect.construct(t,n||[],ee(e).constructor):t.apply(e,n))}function se(e,t){return se=Object.setPrototypeOf||function(a,i){return a.__proto__=i,a},se(e,t)}function oe(e,t){if(typeof t!="function"&&t!==null)throw new TypeError("Super expression must either be null or a function");e.prototype=Object.create(t&&t.prototype,{constructor:{value:e,writable:!0,configurable:!0}}),t&&se(e,t)}let le=(function(){function e(){B(this,e)}return O(e,[{key:"log",value:function(...t){console.log(`[${this.getServiceName()}]`,...t)}},{key:"logError",value:function(...t){console.error(`[${this.getServiceName()}] Error:`,...t)}},{key:"logVerbose",value:function(...t){console.log(`[${this.getServiceName()}] Verbose:`,...t)}},{key:"handleError",value:async function(t){this.lastError=t.error||0;const n=this.getErrorMessage(t);throw this.logError(n),Z(this.getServiceName().toLowerCase(),n),new Error(`${this.getServiceName()} API Error: ${n}`)}},{key:"getErrorMessage",value:function(t){return t.error&&b.API_ERROR_CODES[t.error]?b.API_ERROR_CODES[t.error]:t.message||t.toString()||"Unknown error"}},{key:"makeRequest",value:async function(t,n={}){try{this.logVerbose(`Making request to: ${t}`),ve();const a=await fetch(t,{...n,headers:{"User-Agent":"Vendetta Multi-Service Scrobbler/3.0.0",...n.headers}});if(!a.ok){const s=new Error(`HTTP ${a.status}: ${a.statusText}`);throw Z(this.getServiceName().toLowerCase(),s.message),s}const i=await a.json();return i.error&&await this.handleError(i),this.retryCount=0,i}catch(a){if(this.retryCount++,this.retryCount>b.MAX_RETRY_ATTEMPTS)throw this.retryCount=0,Z(this.getServiceName().toLowerCase(),`Max retries exceeded: ${a.message}`),a;return this.logVerbose(`Request failed, retrying (${this.retryCount}/${b.MAX_RETRY_ATTEMPTS})`),await new Promise(function(i){return setTimeout(i,b.RETRY_DELAY)}),this.makeRequest(t,n)}}},{key:"isDefaultCover",value:function(t){return t?b.DEFAULT_COVER_HASHES.some(function(n){return t.includes(n)}):!0}},{key:"processAlbumArt",value:function(t){return!t||this.isDefaultCover(t)?null:t}},{key:"getLastError",value:function(){return this.lastError}},{key:"resetRetryCount",value:function(){this.retryCount=0}}]),e})(),at=(function(e){oe(t,e);function t(){return B(this,t),ie(this,t,arguments)}return O(t,[{key:"getServiceName",value:function(){return"Last.fm"}},{key:"logVerbose",value:function(...n){l.verboseLogging&&console.log(`[${this.getServiceName()}] Verbose:`,...n)}},{key:"validateCredentials",value:async function(){try{if(!l.username||!l.apiKey)throw new Error("Username or API key not set");const n=new URLSearchParams({method:"user.getinfo",user:l.username,api_key:l.apiKey,format:"json"}),a=`${b.SERVICES.lastfm.baseUrl}?${n}`;return await this.makeRequest(a),this.log("Credentials validation successful"),!0}catch(n){return this.logError("Credentials validation failed:",n),!1}}},{key:"fetchLatestScrobble",value:async function(){try{if(!l.username||!l.apiKey)throw new Error("Username or API key not set");this.logVerbose("Fetching latest scrobble for user:",l.username);const n=new URLSearchParams({method:"user.getrecenttracks",user:l.username,api_key:l.apiKey,limit:"1",extended:"1",format:"json"}),a=`${b.SERVICES.lastfm.baseUrl}?${n}`,i=(await this.makeRequest(a))?.recenttracks?.track?.[0];if(!i)throw new Error("No tracks found");this.logVerbose("Raw track data:",i);const s=!!i["@attr"]?.nowplaying,o=i.date?.uts?parseInt(i.date.uts):Math.floor(Date.now()/1e3),g=function(I,y="name"){return I?typeof I=="string"?I:I["#text"]??I[y]??"":""};let f=null,h=null;if(s)try{const I=new URLSearchParams({method:"track.getInfo",track:i.name,artist:g(i.artist),api_key:l.apiKey,format:"json"}),y=`${b.SERVICES.lastfm.baseUrl}?${I}`,w=await this.makeRequest(y);w?.track?.duration&&(f=parseInt(w.track.duration),f>0&&(f=Math.floor(f/1e3),h=o+f))}catch(I){this.logVerbose("Failed to fetch track duration:",I)}const L=this.processAlbumArt(i.image?.find(function(I){return I.size==="large"})?.["#text"]),$={name:i.name,artist:g(i.artist),album:g(i.album,"title"),albumArt:L,url:i.url,date:i.date?.["#text"]??"now",nowPlaying:s,loved:i.loved==="1",from:o,to:h,duration:f};return this.logVerbose("Processed track:",$),this.log(`${s?"Now playing":"Last played"}:`,`${$.artist} - ${$.name}`),$}catch(n){throw this.logError("Failed to fetch latest scrobble:",n),n}}}]),t})(le),it=(function(e){oe(t,e);function t(){return B(this,t),ie(this,t,arguments)}return O(t,[{key:"getServiceName",value:function(){return"Libre.fm"}},{key:"logVerbose",value:function(...n){l.verboseLogging&&console.log(`[${this.getServiceName()}] Verbose:`,...n)}},{key:"validateCredentials",value:async function(){try{const n=l.librefmUsername,a=l.librefmApiKey;if(!n||!a)throw new Error("Username or API key not set for Libre.fm");const i=new URLSearchParams({method:"user.getinfo",user:n,api_key:a,format:"json"}),s=`${b.SERVICES.librefm.baseUrl}?${i}`;return await this.makeRequest(s),this.log("Credentials validation successful"),!0}catch(n){return this.logError("Credentials validation failed:",n),!1}}},{key:"fetchLatestScrobble",value:async function(){try{const n=l.librefmUsername,a=l.librefmApiKey;if(!n||!a)throw new Error("Username or API key not set for Libre.fm");this.logVerbose("Fetching latest scrobble for user:",n);const i=new URLSearchParams({method:"user.getrecenttracks",user:n,api_key:a,limit:"1",extended:"1",format:"json"}),s=`${b.SERVICES.librefm.baseUrl}?${i}`,o=(await this.makeRequest(s))?.recenttracks?.track?.[0];if(!o)throw new Error("No tracks found");this.logVerbose("Raw track data:",o);const g=!!o["@attr"]?.nowplaying,f=o.date?.uts?parseInt(o.date.uts):Math.floor(Date.now()/1e3),h=function(w,P="name"){return w?typeof w=="string"?w:w["#text"]??w[P]??"":""};let L=null,$=null;if(g)try{const w=new URLSearchParams({method:"track.getInfo",track:o.name,artist:h(o.artist),api_key:a,format:"json"}),P=`${b.SERVICES.librefm.baseUrl}?${w}`,_=await this.makeRequest(P);_?.track?.duration&&(L=parseInt(_.track.duration),L>0&&(L=Math.floor(L/1e3),$=f+L))}catch(w){this.logVerbose("Failed to fetch track duration:",w)}const I=this.processAlbumArt(o.image?.find(function(w){return w.size==="large"})?.["#text"]),y={name:o.name,artist:h(o.artist),album:h(o.album,"title"),albumArt:I,url:o.url,date:o.date?.["#text"]??"now",nowPlaying:g,loved:o.loved==="1",from:f,to:$,duration:L};return this.logVerbose("Processed track:",y),this.log(`${g?"Now playing":"Last played"}:`,`${y.artist} - ${y.name}`),y}catch(n){throw this.logError("Failed to fetch latest scrobble:",n),n}}}]),t})(le),st=(function(e){oe(t,e);function t(){return B(this,t),ie(this,t,arguments)}return O(t,[{key:"getServiceName",value:function(){return"ListenBrainz"}},{key:"logVerbose",value:function(...n){l.verboseLogging&&console.log(`[${this.getServiceName()}] Verbose:`,...n)}},{key:"validateCredentials",value:async function(){try{const n=l.listenbrainzUsername,a=l.listenbrainzToken;if(!n)throw new Error("Username not set for ListenBrainz");const i=`${b.SERVICES.listenbrainz.baseUrl}/user/${encodeURIComponent(n)}/listens?count=1`,s={};return a&&(s.Authorization=`Token ${a}`),await this.makeRequest(i,{headers:s}),this.log("Credentials validation successful"),!0}catch(n){return this.logError("Credentials validation failed:",n),!1}}},{key:"fetchLatestScrobble",value:async function(){try{const n=l.listenbrainzUsername,a=l.listenbrainzToken;if(!n)throw new Error("Username not set for ListenBrainz");this.logVerbose("Fetching latest scrobble for user:",n);let i=null;const s=function(y){if(y){if(Array.isArray(y.listens))return y.listens;if(y.payload&&Array.isArray(y.payload.listens))return y.payload.listens;if(y.data&&Array.isArray(y.data.listens))return y.data.listens}};try{const y=`${b.SERVICES.listenbrainz.baseUrl}/user/${encodeURIComponent(n)}/playing-now`,w={};a&&(w.Authorization=`Token ${a}`);const P=await this.makeRequest(y,{headers:w}),_=s(P);_&&_.length>0&&(i=_[0],i.playing_now=!0)}catch(y){this.logVerbose("No currently playing track or failed to fetch:",y)}let o;if(i)o=i,this.logVerbose("Using currently playing track");else{const y=`${b.SERVICES.listenbrainz.baseUrl}/user/${encodeURIComponent(n)}/listens?count=1`,w={};a&&(w.Authorization=`Token ${a}`);const P=await this.makeRequest(y,{headers:w}),_=(function(){if(P){if(Array.isArray(P.listens))return P.listens;if(P.payload&&Array.isArray(P.payload.listens))return P.payload.listens;if(P.data&&Array.isArray(P.data.listens))return P.data.listens}})();if(!_||_.length===0)throw new Error("No listens found");o=_[0],this.logVerbose("Using latest completed listen")}this.logVerbose("Raw listen data:",o);const g=!!o.playing_now,f=o.listened_at||Math.floor(Date.now()/1e3);let h=null,L=null;o.track_metadata.additional_info?.duration_ms&&(h=Math.floor(o.track_metadata.additional_info.duration_ms/1e3),g&&h>0&&(L=f+h));const $=null;o.track_metadata.additional_info?.release_mbid;const I={name:o.track_metadata.track_name,artist:o.track_metadata.artist_name,album:o.track_metadata.release_name||"",albumArt:$,url:o.track_metadata.additional_info?.origin_url||`https://listenbrainz.org/player/${o.track_metadata.additional_info?.recording_mbid||`${encodeURIComponent(o.track_metadata.artist_name)}/${encodeURIComponent(o.track_metadata.track_name)}`}`,date:g?"now":new Date(f*1e3).toISOString(),nowPlaying:g,loved:!1,from:f,to:L,duration:h};return this.logVerbose("Processed track:",I),this.log(`${g?"Now playing":"Last played"}:`,`${I.artist} - ${I.name}`),I}catch(n){throw this.logError("Failed to fetch latest listen:",n),n}}},{key:"getErrorMessage",value:function(n){return n.error?n.error:n.message?n.message:n.toString()||"Unknown error"}}]),t})(le);const K=(function(){function e(){B(this,e),this.serviceInstances=new Map}return O(e,[{key:"getService",value:function(t){this.serviceInstances||(this.serviceInstances=new Map);const n=t||l.service;if(!n)throw new Error("[ServiceFactory] No service type specified and no default service configured");return this.serviceInstances.has(n)||this.serviceInstances.set(n,this.createService(n)),this.serviceInstances.get(n)}},{key:"getCurrentService",value:function(){return this.getService(l.service)}},{key:"createService",value:function(t){switch(t){case"lastfm":return new at;case"librefm":return new it;case"listenbrainz":return new st;default:throw new Error(`[ServiceFactory] Unknown service type: ${t}`)}}},{key:"clearCache",value:function(){this.serviceInstances?this.serviceInstances.clear():this.serviceInstances=new Map}},{key:"validateCurrentService",value:function(){return this.getCurrentService().validateCredentials()}},{key:"testService",value:async function(t){try{return await this.getService(t).validateCredentials()}catch(n){return console.error(`[ServiceFactory] Failed to test ${t}:`,n),!1}}},{key:"getSupportedServices",value:function(){return["lastfm","librefm","listenbrainz"]}},{key:"getServiceDisplayName",value:function(t){return this.getService(t).getServiceName()}}],[{key:"getInstance",value:function(){return e.instance||(e.instance=new e),e.instance}}]),e})().getInstance();function Se(e){if(!e||e<0)return"0:00";const t=Math.floor(e/3600),n=Math.floor(e%3600/60),a=Math.floor(e%60);return t>0?`${t}:${n.toString().padStart(2,"0")}:${a.toString().padStart(2,"0")}`:`${n}:${a.toString().padStart(2,"0")}`}function Ee(){return Math.floor(Date.now()/1e3)}var ot=(function(e){return e[e.PLAYING=0]="PLAYING",e[e.STREAMING=1]="STREAMING",e[e.LISTENING=2]="LISTENING",e[e.COMPETING=5]="COMPETING",e})(ot||{});const C=function(...e){return console.log("[Scrobble Plugin]",...e)},z=function(...e){return console.error("[Scrobble Plugin] Error:",...e)},N=function(...e){return l.verboseLogging&&console.log("[Scrobble Plugin] Verbose:",...e)},ce=(function(){function e(){B(this,e)}return O(e,[{key:"updateActivity",value:async function(){if(E.pluginStopped){C("Plugin is stopped; skipping activity updates and clearing timers"),N("Plugin is stopped, skipping update");try{this.stopUpdates(),N("Update timers cleared due to stopped plugin")}catch(a){z("Error while stopping updates for stopped plugin:",a)}return}const t=K.getCurrentService().getServiceName();N(`Fetching latest track from ${t}...`);let n=!1;try{if(l.ignoreList&&l.ignoreList.length>0){const o=Ze.findActivity(function(g){return g.name?l.ignoreList.some(function(f){return g.name.toLowerCase().includes(f.toLowerCase())}):!1});if(o){C(`Ignored app (${o.name}) is currently active; clearing activity and skipping updates`),N(`Ignored app (${o.name}) is currently playing, clearing activity`);try{G("ignoredActivity",o.name)}catch(g){N("Failed to set debug info for ignored activity:",g)}ae();return}}ve();const a=await K.getCurrentService().fetchLatestScrobble();if(G("lastTrack",a),!a.nowPlaying){C("No currently playing track reported by service; clearing activity and skipping RPC update"),N("Track is not currently playing");try{G("lastTrack_nowPlaying",!1)}catch(o){N("Failed to set debug info for nowPlaying:",o)}ae();return}if(E.lastTrackUrl===a.url){C("Track unchanged; skipping Discord RPC update"),N("Track hasn't changed"),we(),this.consecutiveFailures=0;return}n=!0,C(`\u{1F3B5} Track changed: ${a.artist} - ${a.name}`);let i;if(a.nowPlaying&&l.showTimestamp&&a.from){const o=Ee();let g=a.from;if(g<o-3600){if(a.duration&&a.duration>0){const f=Math.min(a.duration*.1,30);g=o-f}else g=o;N("had to estimate start time")}i={start:g*1e3},a.to&&(i.end=a.to*1e3)}N(`\u{1F3AF} Preparing RPC update for: ${a.artist} - ${a.name}`);const s={name:l.appName||b.DEFAULT_APP_NAME,flags:0,type:l.listeningTo?2:0,details:a.name,state:`${a.artist}`,status_display_type:1,application_id:b.APPLICATION_ID};if(s.name.includes("{{")){const o={artist:a.artist,name:a.name,album:a.album,service:t};for(const[g,f]of Object.entries(o))s.name=s.name.replace(new RegExp(`{{${g}}}`,"g"),f||"")}if(i&&(s.timestamps=i,N("Timestamps set:",{start:new Date(i.start).toISOString(),end:i.end?new Date(i.end).toISOString():"none",duration:a.duration?Se(a.duration):"unknown"})),a.album||a.albumArt){const o=a.albumArt?[a.albumArt]:[];let g=(await et(o))[0];if(g){if(s.assets={large_image:g},l.showLargeText){let f="";if(l.showAlbumInTooltip&&a.album&&(f+=`on ${a.album}`),l.showDurationInTooltip&&a.duration){const h=Se(a.duration);f?f+=` \u2022 ${h}`:f=h}f&&(s.assets.large_text=f)}N("Album art set:",g),s.assets.large_text&&N("Tooltip text set:",s.assets.large_text)}else a.album&&l.showLargeText&&l.showAlbumInTooltip&&(s.assets={large_text:`on ${a.album}`})}N("Setting Discord activity:",s),G("lastActivity",s),await ye(s),E.lastTrackUrl=a.url,this.currentActivity=s,E.lastActivity=s,this.consecutiveFailures=0,this.lastUpdateTime=Ee(),we(),C(`\u2705 RPC updated successfully: ${a.artist} - ${a.name}`)}catch(a){z("Update failed:",a);try{Z(l.service,a.message)}catch(i){z("Failed to record service error:",i)}try{G("lastUpdateError",{message:a.message,service:l.service,lastTrackUrl:E.lastTrackUrl})}catch(i){N("Failed to set debug info for last update error:",i)}this.handleError(a)}}},{key:"handleError",value:function(t){this.consecutiveFailures++,G("lastError",t),z(`Failure ${this.consecutiveFailures}/${b.MAX_RETRY_ATTEMPTS}:`,t.message),this.consecutiveFailures>=b.MAX_RETRY_ATTEMPTS&&(z("Max retry attempts reached, initiating reconnection..."),this.startReconnection())}},{key:"startReconnection",value:function(){var t=this;this.isReconnecting||(this.isReconnecting=!0,this.stopUpdates(),C("Starting reconnection process..."),this.reconnectTimer=setInterval(function(){C("Attempting to reconnect..."),t.initialize().then(function(){C("Reconnection successful!"),t.stopReconnection()}).catch(function(n){z("Reconnection attempt failed:",n.message)})},b.RETRY_DELAY))}},{key:"stopReconnection",value:function(){try{this.reconnectTimer&&(clearInterval(this.reconnectTimer),this.reconnectTimer=void 0),this.isReconnecting=!1,this.consecutiveFailures=0}catch(t){console.error("[Scrobble Plugin] Reconnection cleanup error:",t)}}},{key:"stopUpdates",value:function(){try{this.updateTimer&&(clearInterval(this.updateTimer),this.updateTimer=void 0)}catch(t){console.error("[Scrobble Plugin] Timer cleanup error:",t)}}},{key:"initialize",value:async function(){var t=this;if(E.pluginStopped)throw new Error("Plugin is stopped");const n=K.getCurrentService().getServiceName();C(`Initializing with ${n}...`);try{if(!await K.validateCurrentService())throw new Error(`Invalid credentials for ${n}`);C(`${n} credentials validated successfully`)}catch(o){throw z(`Failed to validate ${n} credentials:`,o),o}this.stopUpdates(),C("\u{1F3B5} checking for already playing songs..."),await this.updateActivity();const a=l.service;let i=b.MIN_UPDATE_INTERVAL;a==="librefm"&&(i=b.LIBREFM_MIN_UPDATE_INTERVAL,C(`Libre.fm active: enforcing ${i}s minimum update interval`));const s=Math.max((Number(l.timeInterval)||b.DEFAULT_SETTINGS.timeInterval)*1e3,i*1e3);this.updateTimer=setInterval(function(){return t.updateActivity()},s),C(`Update timer started with interval: ${s}ms (${s/1e3}s)`)}},{key:"stop",value:function(){if(!E.pluginStopped){C("Stopping plugin..."),E.pluginStopped=!0;try{this.stopUpdates(),this.stopReconnection(),ae(),C("Plugin stopped successfully")}catch(t){console.error("[Scrobble Plugin] Stop error:",t)}}}},{key:"switchService",value:async function(t){if(E.pluginStopped)return;C(`Switching to ${t}...`);const n=!E.pluginStopped;this.stop();try{K.clearCache(),E.lastTrackUrl=void 0,this.currentActivity=void 0,this.lastUpdateTime=0,n&&(E.pluginStopped=!1,await this.initialize())}catch(a){z("Failed to switch service:",a)}}},{key:"getStatus",value:function(){const t=K.getCurrentService().getServiceName();return{running:!E.pluginStopped,service:t,consecutiveFailures:this.consecutiveFailures,isReconnecting:this.isReconnecting,lastTrackUrl:E.lastTrackUrl,updateInterval:this.updateTimer?"Active":"Inactive"}}}],[{key:"getInstance",value:function(){return e.instance||(e.instance=new e),e.instance}}]),e})().getInstance(),lt=function(){return ce.initialize()},ue=function(){return ce.stop()},ct=function(e){return ce.switchService(e)},{ScrollView:F}=x.findByProps("ScrollView"),{TableRowGroup:T,TableSwitchRow:Te,TableCheckboxRow:q,Stack:U,TableRow:u}=x.findByProps("TableSwitchRow","TableCheckboxRow","TableRowGroup","Stack","TableRow"),{TextInput:M}=x.findByProps("TextInput");function ut(){D.useProxy(p.plugin.storage);const[,e]=r.React.useReducer(function(n){return n+1},0),t=async function(){k.showToast("Testing Last.fm connection...",R.getAssetIDByName("ClockIcon"));try{await W.testService("lastfm")?k.showToast("\u2705 Last.fm connection successful!",R.getAssetIDByName("CheckIcon")):k.showToast("\u274C Last.fm connection failed",R.getAssetIDByName("XIcon"))}catch{k.showToast("\u274C Connection error",R.getAssetIDByName("XIcon"))}};return r.React.createElement(F,{style:{flex:1},contentContainerStyle:{padding:10}},r.React.createElement(U,{spacing:8},r.React.createElement(T,{title:"Credentials"},r.React.createElement(U,{spacing:4},r.React.createElement(M,{placeholder:"Last.fm Username",value:c("username"),onChange:function(n){A("username",n),e()},isClearable:!0}),r.React.createElement(M,{placeholder:"Last.fm API Key",value:c("apiKey"),onChange:function(n){A("apiKey",n),e()},secureTextEntry:!0,isClearable:!0}))),r.React.createElement(T,{title:"Actions"},r.React.createElement(u,{label:"Test Connection",subLabel:"Verify your Last.fm credentials",trailing:r.React.createElement(u.Arrow,null),onPress:t}),r.React.createElement(u,{label:"Get API Key",subLabel:"Create a Last.fm API key at last.fm/api/account/create",trailing:r.React.createElement(u.Arrow,null),onPress:async function(){try{await re.Linking.openURL("https://www.last.fm/api/account/create")}catch(n){console.error("Failed to open Last.fm API URL:",n),k.showToast("Failed to open web browser. Please visit: https://www.last.fm/api/account/create",R.getAssetIDByName("XIcon"))}}}))))}function gt(){D.useProxy(p.plugin.storage);const[,e]=r.React.useReducer(function(n){return n+1},0),t=async function(){k.showToast("Testing Libre.fm connection...",R.getAssetIDByName("ClockIcon"));try{await W.testService("librefm")?k.showToast("\u2705 Libre.fm connection successful!",R.getAssetIDByName("CheckIcon")):k.showToast("\u274C Libre.fm connection failed",R.getAssetIDByName("XIcon"))}catch{k.showToast("\u274C Connection error",R.getAssetIDByName("XIcon"))}};return r.React.createElement(F,{style:{flex:1},contentContainerStyle:{padding:10}},r.React.createElement(U,{spacing:8},r.React.createElement(T,{title:"Credentials"},r.React.createElement(U,{spacing:4},r.React.createElement(M,{placeholder:"Libre.fm Username",value:c("librefmUsername"),onChange:function(n){A("librefmUsername",n),e()},isClearable:!0}),r.React.createElement(M,{placeholder:"Libre.fm API Key",value:c("librefmApiKey"),onChange:function(n){A("librefmApiKey",n),e()},secureTextEntry:!0,isClearable:!0}))),r.React.createElement(T,{title:"Actions"},r.React.createElement(u,{label:"Test Connection",subLabel:"Verify your Libre.fm credentials",trailing:r.React.createElement(u.Arrow,null),onPress:t}),r.React.createElement(u,{label:"Get API Key",subLabel:"Create a Last.fm API key (compatible with Libre.fm)",trailing:r.React.createElement(u.Arrow,null),onPress:async function(){try{await re.Linking.openURL("https://www.last.fm/api/account/create")}catch(n){console.error("Failed to open Last.fm API URL:",n),k.showToast("Failed to open web browser. Please visit: https://www.last.fm/api/account/create",R.getAssetIDByName("XIcon"))}}}))))}function ft(){D.useProxy(p.plugin.storage);const[,e]=r.React.useReducer(function(n){return n+1},0),t=async function(){k.showToast("Testing ListenBrainz connection...",R.getAssetIDByName("ClockIcon"));try{await W.testService("listenbrainz")?k.showToast("\u2705 ListenBrainz connection successful!",R.getAssetIDByName("CheckIcon")):k.showToast("\u274C ListenBrainz connection failed",R.getAssetIDByName("XIcon"))}catch{k.showToast("\u274C Connection error",R.getAssetIDByName("XIcon"))}};return r.React.createElement(F,{style:{flex:1},contentContainerStyle:{padding:10}},r.React.createElement(U,{spacing:8},r.React.createElement(T,{title:"Credentials"},r.React.createElement(U,{spacing:4},r.React.createElement(M,{placeholder:"ListenBrainz Username",value:c("listenbrainzUsername"),onChange:function(n){A("listenbrainzUsername",n),e()},isClearable:!0}),r.React.createElement(M,{placeholder:"ListenBrainz Token",value:c("listenbrainzToken"),onChange:function(n){A("listenbrainzToken",n),e()},secureTextEntry:!0,isClearable:!0}))),r.React.createElement(T,{title:"Actions"},r.React.createElement(u,{label:"Test Connection",subLabel:"Verify your ListenBrainz credentials",trailing:r.React.createElement(u.Arrow,null),onPress:t}),r.React.createElement(u,{label:"Get User Token",subLabel:"Get your ListenBrainz user token at listenbrainz.org/settings/",trailing:r.React.createElement(u.Arrow,null),onPress:async function(){try{await re.Linking.openURL("https://listenbrainz.org/settings/")}catch(n){console.error("Failed to open ListenBrainz settings URL:",n),k.showToast("Failed to open web browser. Please visit: https://listenbrainz.org/settings/",R.getAssetIDByName("XIcon"))}}}))))}function dt(){D.useProxy(p.plugin.storage);const[,e]=r.React.useReducer(function(n){return n+1},0),t=c("service")==="librefm";return r.React.createElement(F,{style:{flex:1},contentContainerStyle:{padding:10}},r.React.createElement(U,{spacing:8},r.React.createElement(T,{title:"Activity Display"},r.React.createElement(U,{spacing:4},r.React.createElement(M,{placeholder:`App Name (Default: ${b.DEFAULT_SETTINGS.appName})`,value:c("appName",b.DEFAULT_SETTINGS.appName),onChange:function(n){A("appName",n),e()},isClearable:!0}),t?r.React.createElement(u,{label:"Update Interval Disabled",subLabel:"Libre.fm requires a fixed 60s update interval to prevent rate limiting",disabled:!0,dimmed:!0}):r.React.createElement(M,{placeholder:`Update Interval (Default: ${b.DEFAULT_SETTINGS.timeInterval}s)`,value:String(c("timeInterval",b.DEFAULT_SETTINGS.timeInterval)),onChange:function(n){const a=Number(n);a>=b.MIN_UPDATE_INTERVAL&&(A("timeInterval",a),e())},keyboardType:"numeric",isClearable:!0}))),r.React.createElement(T,{title:"About Display Settings"},r.React.createElement(u,{label:"App Name",subLabel:"The name shown in Discord for your activity"}),r.React.createElement(u,{label:"Update Interval",subLabel:"How often the plugin checks for new tracks (in seconds)"}),r.React.createElement(u,{label:"Minimum Interval",subLabel:`The plugin will never check more frequently than ${b.MIN_UPDATE_INTERVAL} seconds`}))))}function pt(){D.useProxy(p.plugin.storage);const[e,t]=r.React.useState(null),[n,a]=r.React.useState(!0),[i,s]=r.React.useState(0),[o,g]=r.React.useState(!1),f={name:"Bohemian Rhapsody",artist:"Queen",artists:["Queen"],album:"A Night at the Opera",image:null,nowPlaying:!0,duration:354,startTime:Math.floor(Date.now()/1e3)-120},h=function(d){return d?Array.isArray(d)?d.filter(function(m){return m&&typeof m=="string"}):d["#text"]?d["#text"].split(/[,;&]/).map(function(m){return m.trim()}).filter(function(m){return m.length>0}):typeof d=="string"?d.split(/[,;&]/).map(function(m){return m.trim()}).filter(function(m){return m.length>0}):["Unknown Artist"]:["Unknown Artist"]},L=function(d){return!d||d.length===0?"Unknown Artist":d.length===1?d[0]:d.length===2?`${d[0]} & ${d[1]}`:`${d.slice(0,-1).join(", ")} & ${d[d.length-1]}`};r.React.useEffect(function(){(async function(){if(!c("username")||!c("apiKey")){t(f),g(!0),a(!1);return}try{a(!0);const d=await(await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${c("username")}&api_key=${c("apiKey")}&format=json&limit=1`)).json();if(d.recenttracks&&d.recenttracks.track&&d.recenttracks.track.length>0){const m=d.recenttracks.track[0],j=h(m.artist);let He=180;try{const Ct=j[0]||"Unknown Artist",pe=await(await fetch(`https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${c("apiKey")}&artist=${encodeURIComponent(Ct)}&track=${encodeURIComponent(m.name)}&format=json&u[...]`)).json();pe.track&&pe.track.duration&&(He=Math.floor(pe.track.duration/1e3))}catch{console.log("Could not fetch track duration, using default")}t({name:m.name||"Unknown Track",artist:L(j),artists:j,album:m.album?.["#text"]||"Unknown Album",image:m.image?.[2]?.["#text"]||m.image?.[1]?.["#text"]||null,nowPlaying:m["@attr"]?.nowplaying==="true",duration:He,startTime:m["@attr"]?.nowplaying==="true"?Math.floor(Date.now()/1e3)-60:null}),g(!1)}else t(f),g(!0)}catch(d){console.error("Failed to fetch preview data, using fallback:",d),t(f),g(!0)}finally{a(!1)}})()},[c("username"),c("apiKey")]),r.React.useEffect(function(){if(!e?.nowPlaying||!c("showTimestamp"))return;const d=setInterval(function(){if(e.startTime&&e.duration){const m=Math.floor(Date.now()/1e3)-e.startTime,j=Math.min(m/e.duration,1);s(j)}},1e3);return function(){return clearInterval(d)}},[e,c("showTimestamp")]);const $=function(d){const m=Math.floor(d/60),j=Math.floor(d%60);return`${m}:${j.toString().padStart(2,"0")}`},I=function(){let d="";if(c("showAlbumInTooltip")&&e?.album&&(d+=`on ${e.album}`),c("showDurationInTooltip")&&e?.duration){const m=` \u2022 ${$(e.duration)}`;d?d+=m:d=$(e.duration)}return d||"No tooltip text"},y=function(){return e?.duration?e.nowPlaying?{current:i*e.duration,total:e.duration,progress:i}:{current:e.duration*.3,total:e.duration,progress:.3}:{current:0,total:0,progress:0}},w=c("listeningTo")?"Listening to":"Playing",P=c("appName")||"Music",_=c("showLargeText",!0),Lt=c("showTimestamp",!1);if(n)return r.React.createElement(r.ReactNative.View,{style:v.container},r.React.createElement(r.ReactNative.View,{style:v.loadingContent},r.React.createElement(r.ReactNative.View,{style:v.loadingSpinner}),r.React.createElement(r.ReactNative.Text,{style:v.loadingText},"Loading preview...")));if(!e)return r.React.createElement(r.ReactNative.View,{style:v.container},r.React.createElement(r.ReactNative.Text,{style:v.centeredText},"Unable to load preview"));const de=y(),Xe=I();return r.React.createElement(r.ReactNative.View,{style:v.previewContainer},r.React.createElement(r.ReactNative.View,{style:v.header},r.React.createElement(r.ReactNative.Text,{style:v.activityType},w," ",P),r.React.createElement(r.ReactNative.Text,{style:v.rpcPreviewText,numberOfLines:1},"RPC Preview")),r.React.createElement(r.ReactNative.View,{style:v.content},r.React.createElement(r.ReactNative.View,{style:v.albumArt},e.image?r.React.createElement(r.ReactNative.Image,{source:{uri:e.image},style:v.albumImage,resizeMode:"cover"}):r.React.createElement(r.ReactNative.Text,{style:v.musicIcon},"\u{1F3B5}")),r.React.createElement(r.ReactNative.View,{style:v.trackInfo},r.React.createElement(r.ReactNative.Text,{style:v.trackName,numberOfLines:1},e.name),r.React.createElement(r.ReactNative.Text,{style:v.artistName,numberOfLines:1},e.artist),_&&Xe!=="No tooltip text"&&r.React.createElement(r.ReactNative.Text,{style:v.tooltipText,numberOfLines:1},Xe),Lt&&e.duration?r.React.createElement(r.ReactNative.View,{style:v.progressContainer},r.React.createElement(r.ReactNative.Text,{style:v.timeText},$(de.current)),r.React.createElement(r.ReactNative.View,{style:v.progressBar},r.React.createElement(r.ReactNative.View,{style:[v.progressFill,{width:`${de.progress*100}%`}]})),r.React.createElement(r.ReactNative.Text,{style:v.timeText},$(de.total))):null)))}const v=r.ReactNative.StyleSheet.create({container:{backgroundColor:"#1e1f22",borderRadius:12,padding:16,marginHorizontal:10,marginBottom:16,borderWidth:1,borderColor:"#3a3c41",alignItems:"center",justifyContent:"center",minHeight:120},loadingContent:{alignItems:"center",justifyContent:"center"},loadingSpinner:{width:20,height:20,borderRadius:10,borderWidth:2,borderColor:"#5865f2",borderTopColor:"transparent",marginBottom:8},previewContainer:{backgroundColor:"#1e1f22",borderRadius:12,padding:16,marginHorizontal:10,marginBottom:16,borderWidth:1,borderColor:"#3a3c41"},header:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:12,gap:8},content:{flexDirection:"row",alignItems:"center"},albumArt:{width:80,height:80,backgroundColor:"#2b2d31",borderRadius:12,justifyContent:"center",alignItems:"center",marginRight:16,borderWidth:1,borderColor:"#40444b",overflow:"hidden",flexShrink:0},trackInfo:{flex:1,minWidth:0},progressContainer:{flexDirection:"row",alignItems:"center",gap:8,marginTop:6},progressBar:{flex:1,height:2,backgroundColor:"#2b2d31",borderRadius:3,overflow:"hidden"},progressFill:{height:2,backgroundColor:"#5865f2",borderRadius:3},loadingText:{color:"#949ba4",fontSize:14,fontWeight:"500"},centeredText:{color:"#949ba4",fontSize:14,fontWeight:"500",textAlign:"center"},activityType:{color:"#dbdee1",fontSize:14,fontWeight:"600",flex:1},rpcPreviewText:{color:"#80848e",fontSize:12,fontStyle:"italic",flexShrink:0},albumImage:{width:80,height:80,borderRadius:12},musicIcon:{color:"#80848e",fontSize:32},trackName:{color:"#ffffff",fontSize:16,fontWeight:"700",marginBottom:4},artistName:{color:"#b5bac1",fontSize:14,fontWeight:"500",marginBottom:4},tooltipText:{color:"#80848e",fontSize:12,fontStyle:"italic",marginBottom:6},timeText:{color:"#80848e",fontSize:11,fontWeight:"500",minWidth:35,textAlign:"center"}});function bt(){D.useProxy(p.plugin.storage);const[,e]=r.React.useReducer(function(s){return s+1},0),t=c("listeningTo",b.DEFAULT_SETTINGS.listeningTo),n=c("showTimestamp",b.DEFAULT_SETTINGS.showTimestamp),a=function(){const s=!t;A("listeningTo",s),!s&&n&&A("showTimestamp",!1),e()},i=function(){t&&(A("showTimestamp",!n),e())};return r.React.createElement(F,{style:{flex:1},contentContainerStyle:{padding:10}},r.React.createElement(pt,null),r.React.createElement(U,{spacing:8},r.React.createElement(T,{title:"RPC Display Options"},r.React.createElement(q,{label:"Show as Listening",subLabel:"Display as 'Listening to' instead of 'Playing'",checked:t,onPress:a}),r.React.createElement(q,{label:"Show Tooltip Text",subLabel:"Show album name and track duration in Discord activity tooltip",checked:c("showLargeText",!0),onPress:function(){const s=c("showLargeText",!0);A("showLargeText",!s),e()}}),!t&&r.React.createElement(u,{label:"Timestamp Unavailable",subLabel:"Enable 'Show as Listening' to use timestamp feature",disabled:!0,dimmed:!0}),r.React.createElement(q,{label:"Show Timestamp",subLabel:"Display track progress and duration",checked:n,onPress:i,disabled:!t}),r.React.createElement(q,{label:"Show Album in Tooltip",subLabel:"Include album name in the tooltip text",checked:c("showAlbumInTooltip",!0),onPress:function(){const s=c("showAlbumInTooltip",!0);A("showAlbumInTooltip",!s),e()}}),r.React.createElement(q,{label:"Show Duration in Tooltip",subLabel:"Include track duration in the tooltip text",checked:c("showDurationInTooltip",!0),onPress:function(){const s=c("showDurationInTooltip",!0);A("showDurationInTooltip",!s),e()}}))))}function ht(){D.useProxy(p.plugin.storage);const[,e]=r.React.useReducer(function(s){return s+1},0),[t,n]=r.React.useState(""),a=function(){if(!t.trim()){k.showToast("Please enter an app name",R.getAssetIDByName("Small"));return}const s=c("ignoreList",[]);s.includes(t.trim())?k.showToast("App already in ignore list",R.getAssetIDByName("Warning")):(A("ignoreList",[...s,t.trim()]),n(""),e(),k.showToast("App added to ignore list",R.getAssetIDByName("Check")))},i=function(s){const o=c("ignoreList",[]);A("ignoreList",o.filter(function(g){return g!==s})),e(),k.showToast("App removed from ignore list",R.getAssetIDByName("Check"))};return r.React.createElement(F,{style:{flex:1},contentContainerStyle:{padding:10}},r.React.createElement(U,{spacing:8},r.React.createElement(T,{title:"Add App to Ignore"},r.React.createElement(U,{spacing:4},r.React.createElement(M,{placeholder:"Enter app name",value:t,onChange:n,isClearable:!0,onSubmitEditing:a,returnKeyType:"done"}))),r.React.createElement(T,null,r.React.createElement(u,{label:"Add to Ignore List",subLabel:"Add the current app name to your ignore list",trailing:r.React.createElement(u.Arrow,null),onPress:a})),c("ignoreList",[]).length>0&&r.React.createElement(T,{title:"Ignored Apps"},c("ignoreList",[]).map(function(s,o){return r.React.createElement(u,{key:o,label:s,trailing:r.React.createElement(r.ReactNative.TouchableOpacity,{onPress:function(){return i(s)},style:{padding:8,backgroundColor:"#ff4d4d",borderRadius:12,width:24,height:24,justifyContent:"center",alignItems:"center"}},r.React.createElement(r.ReactNative.Image,{source:R.getAssetIDByName("TrashIcon"),style:{width:14,height:14,tintColor:"#ffffff"}}))})})),r.React.createElement(T,{title:"About Ignore List"},r.React.createElement(u,{label:"How it Works",subLabel:"When any app in your ignore list is active, your music status will be hidden"}),r.React.createElement(u,{label:"Detection",subLabel:"Apps are detected by their Discord activity name"}),r.React.createElement(u,{label:"Examples",subLabel:"Spotify, YouTube Music, Kizzy, Metrolist, echo"}))))}function yt(){D.useProxy(p.plugin.storage);const[,e]=r.React.useReducer(function(t){return t+1},0);return r.React.createElement(F,{style:{flex:1},contentContainerStyle:{padding:10}},r.React.createElement(U,{spacing:8},r.React.createElement(T,{title:"Logging Options"},r.React.createElement(Te,{label:"Verbose Logging",subLabel:"Enable detailed console logging for debugging",value:c("verboseLogging",b.DEFAULT_SETTINGS.verboseLogging),onValueChange:function(t){A("verboseLogging",t),e()}})),r.React.createElement(T,{title:"Debug Information"},r.React.createElement(u,{label:"Console Logging",subLabel:"Logs are written to the browser/app console when verbose is enabled"}),r.React.createElement(u,{label:"Error Tracking",subLabel:"Connection errors and API failures are automatically logged"})),r.React.createElement(T,{title:"Log Information"},r.React.createElement(u,{label:"API Calls",subLabel:"All API requests are logged when verbose is enabled"}),r.React.createElement(u,{label:"Track Updates",subLabel:"Song changes and RPC updates are logged"}),r.React.createElement(u,{label:"Error Details",subLabel:"Connection errors and retries are logged"}))))}var Ie,ke,Ae,Le,Ce,Pe,Ne,$e,Ue,_e,De,Me,xe,ze,Fe,Ve,Be;(Ie=p.plugin.storage).username??(Ie.username=""),(ke=p.plugin.storage).apiKey??(ke.apiKey=""),(Ae=p.plugin.storage).appName??(Ae.appName="Music"),(Le=p.plugin.storage).timeInterval??(Le.timeInterval=5),(Ce=p.plugin.storage).showTimestamp??(Ce.showTimestamp=!0),(Pe=p.plugin.storage).listeningTo??(Pe.listeningTo=!0),(Ne=p.plugin.storage).verboseLogging??(Ne.verboseLogging=!1),($e=p.plugin.storage).service??($e.service="lastfm"),(Ue=p.plugin.storage).librefmUsername??(Ue.librefmUsername=""),(_e=p.plugin.storage).librefmApiKey??(_e.librefmApiKey=""),(De=p.plugin.storage).listenbrainzUsername??(De.listenbrainzUsername=""),(Me=p.plugin.storage).listenbrainzToken??(Me.listenbrainzToken=""),(xe=p.plugin.storage).addToSidebar??(xe.addToSidebar=!0),(ze=p.plugin.storage).showLargeText??(ze.showLargeText=!0),(Fe=p.plugin.storage).ignoreList??(Fe.ignoreList=[]),(Ve=p.plugin.storage).showAlbumInTooltip??(Ve.showAlbumInTooltip=!0),(Be=p.plugin.storage).showDurationInTooltip??(Be.showDurationInTooltip=!0);const c=function(e,t){return p.plugin.storage[e]??t},A=function(e,t){return p.plugin.storage[e]=t},W=(function(){function e(){B(this,e)}return O(e,null,[{key:"getServiceDisplayName",value:function(t){switch(t){case"lastfm":return"Last.fm";case"librefm":return"Libre.fm";case"listenbrainz":return"ListenBrainz";default:return"Unknown"}}},{key:"testService",value:async function(t){try{switch(t){case"lastfm":return await this.testLastFmConnection();case"librefm":return await this.testLibreFmConnection();case"listenbrainz":return await this.testListenBrainzConnection();default:return!1}}catch(n){return console.error(`Error testing ${t}:`,n),!1}}},{key:"testLastFmConnection",value:async function(){const t=c("username"),n=c("apiKey");if(!t||!n)return!1;try{return!(await(await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${t}&api_key=${n}&format=json`)).json()).error}catch(a){return console.error("Last.fm connection test failed:",a),!1}}},{key:"testLibreFmConnection",value:async function(){const t=c("librefmUsername"),n=c("librefmApiKey");if(!t||!n)return!1;try{return!(await(await fetch(`https://libre.fm/2.0/?method=user.getinfo&user=${t}&api_key=${n}&format=json`)).json()).error}catch(a){return console.error("Libre.fm connection test failed:",a),!1}}},{key:"testListenBrainzConnection",value:async function(){const t=c("listenbrainzUsername"),n=c("listenbrainzToken");if(!t)return!1;try{const a={"Content-Type":"application/json"};return n&&(a.Authorization=`Token ${n}`),(await fetch(`https://api.listenbrainz.org/1/user/${t}/listen-count`,{headers:a})).status===200}catch(a){return console.error("ListenBrainz connection test failed:",a),!1}}}]),e})();function Oe(){D.useProxy(p.plugin.storage);const e=r.NavigationNative.useNavigation(),[,t]=r.React.useReducer(function(i){return i+1},0),n=c("service"),a=function(i){switch(i){case"lastfm":return c("username")&&c("apiKey")?"\u2705 Configured":"\u274C Missing credentials";case"librefm":return c("librefmUsername")&&c("librefmApiKey")?"\u2705 Configured":"\u274C Missing credentials";case"listenbrainz":return c("listenbrainzUsername")?"\u2705 Configured":"\u274C Missing username";default:return"\u2753 Unknown"}};return r.React.createElement(F,{style:{flex:1},contentContainerStyle:{padding:10}},r.React.createElement(U,{spacing:8},r.React.createElement(T,{title:"Active Service"},r.React.createElement(u,{label:"Current Service",subLabel:n?`Using: ${W.getServiceDisplayName(n)}`:"No service selected"}),["lastfm","librefm","listenbrainz"].map(function(i){return r.React.createElement(q,{key:i,label:W.getServiceDisplayName(i),subLabel:a(i),checked:n===i,onPress:function(){i!==n&&(A("service",i),t())}})})),r.React.createElement(T,{title:"Service Configuration"},r.React.createElement(u,{label:"Last.fm Settings",subLabel:"Configure Last.fm credentials and options",trailing:r.React.createElement(u.Arrow,null),onPress:function(){return e.push("VendettaCustomPage",{title:"Last.fm Settings",render:ut})}}),r.React.createElement(u,{label:"Libre.fm Settings",subLabel:"Configure Libre.fm credentials and options",trailing:r.React.createElement(u.Arrow,null),onPress:function(){return e.push("VendettaCustomPage",{title:"Libre.fm Settings",render:gt})}}),r.React.createElement(u,{label:"ListenBrainz Settings",subLabel:"Configure ListenBrainz credentials and options",trailing:r.React.createElement(u.Arrow,null),onPress:function(){return e.push("VendettaCustomPage",{title:"ListenBrainz Settings",render:ft})}})),r.React.createElement(T,{title:"Plugin Configuration"},r.React.createElement(u,{label:"Display Settings",subLabel:"Customize app name and update interval",trailing:r.React.createElement(u.Arrow,null),onPress:function(){return e.push("VendettaCustomPage",{title:"Display Settings",render:dt})}}),r.React.createElement(u,{label:"RPC Customization",subLabel:"Customize Discord rich presence display options",trailing:r.React.createElement(u.Arrow,null),onPress:function(){return e.push("VendettaCustomPage",{title:"RPC Customization",render:bt})}}),r.React.createElement(u,{label:"Ignore List",subLabel:"Configure apps that should hide your status",trailing:r.React.createElement(u.Arrow,null),onPress:function(){return e.push("VendettaCustomPage",{title:"Ignore List Settings",render:ht})}}),r.React.createElement(u,{label:"Logging Settings",subLabel:"Configure logging and debugging options",trailing:r.React.createElement(u.Arrow,null),onPress:function(){return e.push("VendettaCustomPage",{title:"Logging Settings",render:yt})}}),r.React.createElement(Te,{label:"Add to Sidebar",subLabel:"Show plugin in Discord settings",value:c("addToSidebar",!1),onValueChange:function(i){A("addToSidebar",i),t()}})),r.React.createElement(T,{title:"About"},r.React.createElement(u,{label:"RPC",subLabel:"Show off your music status from multiple services"}),r.React.createElement(u,{label:"Author",subLabel:"kmmiio99o"}),r.React.createElement(u,{label:"Version",subLabel:"1.3.2"}))))}const{FormSection:mt,FormRow:ge}=Qe.Forms,{TableRowIcon:vt}=x.findByProps("TableRowIcon"),X=window.bunny,Ke=X?.metro?.findByPropsLazy("getRootNavigationRef"),fe=X?.metro?.findByPropsLazy("SETTING_RENDERER_CONFIG"),je=X?.metro?.findByPropsLazy("createList"),Ge=X?.metro?.findByNameLazy("SettingsOverviewScreen",!1);function wt({tabs:e}){const t=r.NavigationNative.useNavigation();return r.React.createElement(ge,{label:e.title(),leading:r.React.createElement(ge.Icon,{source:e.icon}),trailing:r.React.createElement(r.React.Fragment,{},[e.trailing?e.trailing():null,r.React.createElement(ge.Arrow,{key:"arrow"})]),onPress:function(){const n=e.page;t.navigate("VendettaCustomPage",{title:e.title(),render:function(){return r.React.createElement(n)}})}})}function Rt(e,t){try{t.push(Q.after("default",X?.metro?.findByPropsLazy(["renderTitle","sections"],!1),function(n,a){const i=ne.findInReactTree(a.props.children,function(s){return s.type?.name==="UserSettingsOverview"});i&&t.push(Q.after("render",i.type.prototype,function(s,o){const g=ne.findInReactTree(o.props.children,function(f){return f?.children?.[1]?.type===mt})?.children;if(g){const f=g.findIndex(function(h){return["BILLING_SETTINGS","PREMIUM_SETTINGS"].includes(h?.props?.label)});g.splice(-~f||4,0,r.React.createElement(wt,{key:e.key,tabs:e}))}}))},!0))}catch(n){p.logger.info("Panel UI patch failed graciously \u{1F494}",n)}}function St(e,t){if(!fe||!Ke){console.warn("[LastFm] Missing required constants for tabs UI patch");return}const n={[e.key]:{type:"pressable",useTitle:e.title,title:e.title,icon:e.icon,IconComponent:e.icon&&function(){return r.React.createElement(vt,{source:e.icon})},usePredicate:e.predicate,useTrailing:e.trailing,onPress:function(){const s=Ke.getRootNavigationRef(),o=e.page;s.navigate("VendettaCustomPage",{title:e.title(),render:function(){return r.React.createElement(o)}})},withArrow:!0}};let a=fe.SETTING_RENDERER_CONFIG;Object.defineProperty(fe,"SETTING_RENDERER_CONFIG",{enumerable:!0,configurable:!0,get:function(){return{...a,...n}},set:function(s){return a=s}});const i=Symbol("pinToSettings meow meow");try{if(!je)return;t.push(Q.after("createList",je,function(s,o){if(!s[0][i]){s[0][i]=!0;const[g]=s,f=g.sections?.find(function(h){return["Bunny","Revenge","Kettu","Vencore","ShiggyCord"].some(function(L){return h.label===L&&h.title===L})});f?.settings&&(f.settings=[...f.settings,e.key])}}))}catch{if(!Ge)return;t.push(Q.after("default",Ge,function(s,o){if(!s[0][i]){s[0][i]=!0;const{sections:g}=ne.findInReactTree(o,function(h){return h.props?.sections}).props,f=g?.find(function(h){return["Bunny","Revenge","Kettu","Vencore","ShiggyCord"].some(function(L){return h.label===L&&h.title===L})});f?.settings&&(f.settings=[...f.settings,e.key])}}))}}function Et(e){const t=[];let n=!1;const a=e.predicate||function(){return!0};return e.predicate=function(){return n?!1:a()},Rt(e,t),St(e,t),t.push(function(){return n=!0}),function(){for(const i of t)i()}}function qe(){if(!p.plugin.storage.addToSidebar)return console.log("[RPC] Sidebar disabled in settings"),function(){};console.log("[RPC] Patching sidebar using custom patchSettingsPin...");try{const e=Et({key:"LastFmScrobbler",icon:R.getAssetIDByName("MusicIcon"),title:function(){return"RPC"},predicate:function(){return p.plugin.storage.addToSidebar===!0},page:Oe});return console.log("[RPC] Successfully patched sidebar"),e}catch(e){return console.error("[RPC] Failed to patch sidebar:",e),function(){}}}var Ye;const E={pluginStopped:!1,lastActivity:void 0,updateInterval:void 0,lastTrackUrl:void 0};let V;const We=b.DEFAULT_SETTINGS;Object.keys(We).forEach(function(e){p.plugin.storage[e]=p.plugin.storage[e]??We[e]}),(Ye=p.plugin.storage).addToSidebar??(Ye.addToSidebar=!1);const l=new Proxy(p.plugin.storage,{get(e,t){return e[t]},set(e,t,n){return e[t]=n,!0}});let te=0;const Tt=3,It=5e3;async function H(){try{await lt(),te=0,console.log("[RPC] Successfully connected")}catch(e){console.error("[RPC] Initialization error:",e),te++,te<Tt?(console.log(`[RPC] Retrying connection... (attempt ${te})`),setTimeout(H,It)):console.error("[RPC] Failed to connect after multiple attempts")}}async function kt(){if(!l.service){console.log("[RPC] No service selected. Please configure a service in settings.");return}let e="Unknown";try{e=K.getCurrentService().getServiceName()}catch(a){console.error("[RPC] Failed to determine current service name:",a)}const t=l.service;let n=!1;switch(t){case"lastfm":n=!!(l.username&&l.apiKey);break;case"librefm":n=!!(l.librefmUsername&&l.librefmApiKey);break;case"listenbrainz":n=!!l.listenbrainzUsername;break}if(!n){console.error(`[RPC] Missing credentials for ${e}. Please configure in settings.`);return}if(console.log(`[RPC] Starting with ${e}...`),he.getCurrentUser())H();else{const a=function(){he.getCurrentUser()&&(H(),r.FluxDispatcher.unsubscribe("CONNECTION_OPEN",a))};r.FluxDispatcher.subscribe("CONNECTION_OPEN",a)}}var At={onLoad(){if(console.log("[RPC] Loading..."),E.pluginStopped=!1,l.addToSidebar!==!1)try{V=qe(),console.log("[RPC] Sidebar patched successfully")}catch(e){console.error("[RPC] Failed to patch sidebar:",e)}kt()},onUnload(){if(console.log("[RPC] Unloading..."),E.pluginStopped=!0,V)try{V(),V=void 0,console.log("[RPC] Sidebar unpatched")}catch(e){console.error("[RPC] Failed to unpatch sidebar:",e)}ue()},async onSettingsUpdate(e){const t=l.service,n=e.service,a=l.addToSidebar,i=e.addToSidebar;if(Object.assign(l,e),a!==i){if(i)try{V=qe(),console.log("[RPC] Sidebar enabled")}catch(s){console.error("[RPC] Failed to enable sidebar:",s)}else if(V){try{V()}catch(s){console.error("[RPC] Failed to unpatch sidebar:",s)}V=void 0,console.log("[RPC] Sidebar disabled")}}if(t!==n&&n){console.log(`[RPC] Service changed from ${t||"none"} to ${n}`);try{await ct(n)}catch(s){console.error("[RPC] Failed to switch service:",s)}}else if(!E.pluginStopped&&l.service)H();else if(!l.service){console.log("[RPC] Service unselected, stopping plugin...");try{ue()}catch(s){console.error("[RPC] Error while stopping due to service unselected:",s)}}},onDiscordReconnect(){E.pluginStopped||(console.log("[RPC] Discord reconnected, reinitializing..."),H())},settings:Oe};return Y.currentSettings=l,Y.default=At,Y.pluginState=E,Object.defineProperty(Y,"__esModule",{value:!0}),Y})({},vendetta,vendetta.metro.common,vendetta.metro,window.React,vendetta.storage,vendetta.metro.common.ReactNative,vendetta.ui.toasts,vendetta.ui.assets,vendetta.patcher,vendetta.ui.components,vendetta.utils);
+(function(Y,p,r,x,Pt,D,re,k,R,Q,Qe,ne){
+    var constants_default = Constants;
+
+  // src/modules.ts
+  var import_metro = x;
+  var { SET_ACTIVITY } = (0, import_metro.findByProps)("SET_ACTIVITY");
+  var AssetManager = (0, import_metro.findByProps)("getAssetIds");
+  var SelfPresenceStore = (0, import_metro.findByStoreName)("SelfPresenceStore");
+  var UserStore = (0, import_metro.findByStoreName)("UserStore");
+
+  // src/utils/activity.ts
+  var import_common = r;
+  function clearActivity() {
+    return sendRequest(null);
+  }
+  function sendRequest(activity) {
+    if (pluginState.pluginStopped) {
+      stop();
+      activity = null;
+    }
+    pluginState.lastActivity = activity;
+    import_common.FluxDispatcher.dispatch({
+      type: "LOCAL_ACTIVITY_UPDATE",
+      activity,
+      pid: 2312,
+      socketId: "Multi-Scrobbler@Vendetta"
+    });
+  }
+  async function fetchAsset(asset, appId = constants_default.APPLICATION_ID) {
+    if (!asset?.length) return [];
+    try {
+      return await AssetManager.fetchAssetIds(appId, asset);
+    } catch (error) {
+      console.error("[Multi-Scrobbler] Failed to fetch assets:", error);
+      return [];
+    }
+  }
+
+  // src/utils/debug.ts
+  var import_react = Qe;
+  var __forceUpdate;
+  var debugInfo = {};
+  debugInfo.componentMountErrors = [];
+  debugInfo.componentMountCount = 0;
+  debugInfo.settingsLoadAttempts = 0;
+  debugInfo.serviceErrors = { lastfm: [], listenbrainz: [] };
+  debugInfo.apiCallCount = 0;
+  debugInfo.connectionAttempts = 0;
+  debugInfo.lastCredentialValidation = {
+    lastfm: false,
+    listenbrainz: false
+  };
+  var log = (...args) => console.log("[Debug]", ...args);
+  var logError = (...args) => console.error("[Debug] Error:", ...args);
+  function setDebugInfo(key, value) {
+    debugInfo[key] = value;
+    if (key === "lastError" && value) {
+      logError("Error recorded:", value.message);
+    } else if (key === "lastTrack" && value) {
+      log(
+        "Track updated:",
+        `${value.artist} - ${value.name}`
+      );
+    } else if (key === "currentService" && value) {
+      log("Service changed to:", value);
+    }
+    __forceUpdate?.();
+  }
+  function incrementApiCall() {
+    debugInfo.apiCallCount = (debugInfo.apiCallCount || 0) + 1;
+    log(`API call count: ${debugInfo.apiCallCount}`);
+  }
+  function recordServiceError(service, error) {
+    debugInfo.serviceErrors = debugInfo.serviceErrors || {
+      lastfm: [],
+      listenbrainz: []
+    };
+    debugInfo.serviceErrors[service] = debugInfo.serviceErrors[service] || [];
+    debugInfo.serviceErrors[service].push(
+      `${(/* @__PURE__ */ new Date()).toISOString()}: ${error}`
+    );
+    if (debugInfo.serviceErrors[service].length > 10) {
+      debugInfo.serviceErrors[service] = debugInfo.serviceErrors[service].slice(-10);
+    }
+    logError(`${service} error:`, error);
+    __forceUpdate?.();
+  }
+  function recordSuccessfulUpdate() {
+    debugInfo.lastSuccessfulUpdate = (/* @__PURE__ */ new Date()).toISOString();
+    log("Successful update recorded at:", debugInfo.lastSuccessfulUpdate);
+    __forceUpdate?.();
+  }
+
+  // src/services/BaseService.ts
+  var BaseService = class {
+    retryCount = 0;
+    lastError = 0;
+    log(...args) {
+      console.log(`[${this.getServiceName()}]`, ...args);
+    }
+    logError(...args) {
+      console.error(`[${this.getServiceName()}] Error:`, ...args);
+    }
+    logVerbose(...args) {
+      console.log(`[${this.getServiceName()}] Verbose:`, ...args);
+    }
+    async handleError(error) {
+      this.lastError = error.error || 0;
+      const errorMessage = this.getErrorMessage(error);
+      this.logError(errorMessage);
+      recordServiceError(
+        this.getServiceName().toLowerCase(),
+        errorMessage
+      );
+      throw new Error(`${this.getServiceName()} API Error: ${errorMessage}`);
+    }
+    getErrorMessage(error) {
+      if (error.error && constants_default.API_ERROR_CODES[error.error]) {
+        return constants_default.API_ERROR_CODES[error.error];
+      }
+      return error.message || error.toString() || "Unknown error";
+    }
+    async makeRequest(url, options = {}) {
+      try {
+        this.logVerbose(`Making request to: ${url}`);
+        incrementApiCall();
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            "User-Agent": "Vendetta Multi-Service Scrobbler/3.0.0",
+            ...options.headers
+          }
+        });
+        if (!response.ok) {
+          const error = new Error(
+            `HTTP ${response.status}: ${response.statusText}`
+          );
+          recordServiceError(
+            this.getServiceName().toLowerCase(),
+            error.message
+          );
+          throw error;
+        }
+        const data = await response.json();
+        if (data.error) {
+          await this.handleError(data);
+        }
+        this.retryCount = 0;
+        return data;
+      } catch (error) {
+        this.retryCount++;
+        if (this.retryCount > constants_default.MAX_RETRY_ATTEMPTS) {
+          this.retryCount = 0;
+          recordServiceError(
+            this.getServiceName().toLowerCase(),
+            `Max retries exceeded: ${error.message}`
+          );
+          throw error;
+        }
+        this.logVerbose(
+          `Request failed, retrying (${this.retryCount}/${constants_default.MAX_RETRY_ATTEMPTS})`
+        );
+        await new Promise(
+          (resolve) => setTimeout(resolve, constants_default.RETRY_DELAY)
+        );
+        return this.makeRequest(url, options);
+      }
+    }
+    isDefaultCover(cover) {
+      if (!cover) return true;
+      return constants_default.DEFAULT_COVER_HASHES.some((hash) => cover.includes(hash));
+    }
+    processAlbumArt(cover) {
+      if (!cover || this.isDefaultCover(cover)) {
+        return null;
+      }
+      return cover;
+    }
+    getLastError() {
+      return this.lastError;
+    }
+    resetRetryCount() {
+      this.retryCount = 0;
+    }
+  };
+
+  // src/services/LastFmService.ts
+  var LastFmService = class extends BaseService {
+    getServiceName() {
+      return "Last.fm";
+    }
+    logVerbose(...args) {
+      if (currentSettings.verboseLogging) {
+        console.log(`[${this.getServiceName()}] Verbose:`, ...args);
+      }
+    }
+    async validateCredentials() {
+      try {
+        if (!currentSettings.username || !currentSettings.apiKey) {
+          throw new Error("Username or API key not set");
+        }
+        const params = new URLSearchParams({
+          method: "user.getinfo",
+          user: currentSettings.username,
+          api_key: currentSettings.apiKey,
+          format: "json"
+        });
+        const url = `${constants_default.SERVICES.lastfm.baseUrl}?${params}`;
+        await this.makeRequest(url);
+        this.log("Credentials validation successful");
+        return true;
+      } catch (error) {
+        this.logError("Credentials validation failed:", error);
+        return false;
+      }
+    }
+    async fetchLatestScrobble() {
+      try {
+        if (!currentSettings.username || !currentSettings.apiKey) {
+          throw new Error("Username or API key not set");
+        }
+        this.logVerbose(
+          "Fetching latest scrobble for user:",
+          currentSettings.username
+        );
+        const params = new URLSearchParams({
+          method: "user.getrecenttracks",
+          user: currentSettings.username,
+          api_key: currentSettings.apiKey,
+          limit: "1",
+          extended: "1",
+          format: "json"
+        });
+        const url = `${constants_default.SERVICES.lastfm.baseUrl}?${params}`;
+        const data = await this.makeRequest(url);
+        const lastTrack = data?.recenttracks?.track?.[0];
+        if (!lastTrack) {
+          throw new Error("No tracks found");
+        }
+        this.logVerbose("Raw track data:", lastTrack);
+        const isNowPlaying = Boolean(lastTrack["@attr"]?.nowplaying);
+        const trackTimestamp = lastTrack.date?.uts ? parseInt(lastTrack.date.uts) : Math.floor(Date.now() / 1e3);
+        const resolveField = (v, altKey = "name") => {
+          if (!v) return "";
+          if (typeof v === "string") return v;
+          return v["#text"] ?? v[altKey] ?? "";
+        };
+        let duration = null;
+        let endTime = null;
+        if (isNowPlaying) {
+          try {
+            const trackInfoParams = new URLSearchParams({
+              method: "track.getInfo",
+              track: lastTrack.name,
+              artist: resolveField(lastTrack.artist),
+              api_key: currentSettings.apiKey,
+              format: "json"
+            });
+            const trackInfoUrl = `${constants_default.SERVICES.lastfm.baseUrl}?${trackInfoParams}`;
+            const trackInfo = await this.makeRequest(trackInfoUrl);
+            if (trackInfo?.track?.duration) {
+              duration = parseInt(trackInfo.track.duration);
+              if (duration > 0) {
+                duration = Math.floor(duration / 1e3);
+                endTime = trackTimestamp + duration;
+              }
+            }
+          } catch (error) {
+            this.logVerbose("Failed to fetch track duration:", error);
+          }
+        }
+        const albumArt = this.processAlbumArt(
+          lastTrack.image?.find((img) => img.size === "large")?.["#text"]
+        );
+        const track = {
+          name: lastTrack.name,
+          artist: resolveField(lastTrack.artist),
+          album: resolveField(lastTrack.album, "title"),
+          albumArt,
+          url: lastTrack.url,
+          date: lastTrack.date?.["#text"] ?? "now",
+          nowPlaying: isNowPlaying,
+          loved: lastTrack.loved === "1",
+          from: trackTimestamp,
+          to: endTime,
+          duration
+        };
+        this.logVerbose("Processed track:", track);
+        this.log(
+          `${isNowPlaying ? "Now playing" : "Last played"}:`,
+          `${track.artist} - ${track.name}`
+        );
+        return track;
+      } catch (error) {
+        this.logError("Failed to fetch latest scrobble:", error);
+        throw error;
+      }
+    }
+  };
+
+  // src/services/ListenBrainzService.ts
+  var ListenBrainzService = class extends BaseService {
+    getServiceName() {
+      return "ListenBrainz";
+    }
+    logVerbose(...args) {
+      if (currentSettings.verboseLogging) {
+        console.log(`[${this.getServiceName()}] Verbose:`, ...args);
+      }
+    }
+    async validateCredentials() {
+      try {
+        const username = currentSettings.listenbrainzUsername;
+        const token = currentSettings.listenbrainzToken;
+        if (!username) {
+          throw new Error("Username not set for ListenBrainz");
+        }
+        const url = `${constants_default.SERVICES.listenbrainz.baseUrl}/user/${encodeURIComponent(username)}/listens?count=1`;
+        const headers = {};
+        if (token) {
+          headers["Authorization"] = `Token ${token}`;
+        }
+        await this.makeRequest(url, { headers });
+        this.log("Credentials validation successful");
+        return true;
+      } catch (error) {
+        this.logError("Credentials validation failed:", error);
+        return false;
+      }
+    }
+    async fetchLatestScrobble() {
+      try {
+        const username = currentSettings.listenbrainzUsername;
+        const token = currentSettings.listenbrainzToken;
+        if (!username) {
+          throw new Error("Username not set for ListenBrainz");
+        }
+        this.logVerbose("Fetching latest scrobble for user:", username);
+        let currentlyPlaying = null;
+        const extractListens = (resp) => {
+          if (!resp) return void 0;
+          if (Array.isArray(resp.listens)) return resp.listens;
+          if (resp.payload && Array.isArray(resp.payload.listens))
+            return resp.payload.listens;
+          if (resp.data && Array.isArray(resp.data.listens))
+            return resp.data.listens;
+          return void 0;
+        };
+        try {
+          const playingNowUrl = `${constants_default.SERVICES.listenbrainz.baseUrl}/user/${encodeURIComponent(username)}/playing-now`;
+          const headers = {};
+          if (token) {
+            headers["Authorization"] = `Token ${token}`;
+          }
+          const playingNowRaw = await this.makeRequest(playingNowUrl, {
+            headers
+          });
+          const playingNowListens = extractListens(playingNowRaw);
+          if (playingNowListens && playingNowListens.length > 0) {
+            currentlyPlaying = playingNowListens[0];
+            currentlyPlaying.playing_now = true;
+          }
+        } catch (error) {
+          this.logVerbose(
+            "No currently playing track or failed to fetch:",
+            error
+          );
+        }
+        let latestListen;
+        if (currentlyPlaying) {
+          latestListen = currentlyPlaying;
+          this.logVerbose("Using currently playing track");
+        } else {
+          const url = `${constants_default.SERVICES.listenbrainz.baseUrl}/user/${encodeURIComponent(username)}/listens?count=1`;
+          const headers = {};
+          if (token) {
+            headers["Authorization"] = `Token ${token}`;
+          }
+          const dataRaw = await this.makeRequest(url, {
+            headers
+          });
+          const recentListens = (() => {
+            if (!dataRaw) return void 0;
+            if (Array.isArray(dataRaw.listens)) return dataRaw.listens;
+            if (dataRaw.payload && Array.isArray(dataRaw.payload.listens))
+              return dataRaw.payload.listens;
+            if (dataRaw.data && Array.isArray(dataRaw.data.listens))
+              return dataRaw.data.listens;
+            return void 0;
+          })();
+          if (!recentListens || recentListens.length === 0) {
+            throw new Error("No listens found");
+          }
+          latestListen = recentListens[0];
+          this.logVerbose("Using latest completed listen");
+        }
+        this.logVerbose("Raw listen data:", latestListen);
+        const isNowPlaying = Boolean(latestListen.playing_now);
+        const trackTimestamp = latestListen.listened_at || Math.floor(Date.now() / 1e3);
+        let duration = null;
+        let endTime = null;
+        if (latestListen.track_metadata.additional_info?.duration_ms) {
+          duration = Math.floor(
+            latestListen.track_metadata.additional_info.duration_ms / 1e3
+          );
+          if (isNowPlaying && duration > 0) {
+            endTime = trackTimestamp + duration;
+          }
+        }
+        let albumArt = null;
+        if (latestListen.track_metadata.additional_info?.release_mbid) {
+          try {
+            const coverUrl = `https://coverartarchive.org/release/${latestListen.track_metadata.additional_info.release_mbid}/front`;
+            const coverResponse = await fetch(coverUrl, { method: "HEAD", redirect: "follow" });
+            if (coverResponse.ok) {
+              albumArt = coverUrl;
+              this.logVerbose("Found album art from Cover Art Archive");
+            }
+          } catch (error) {
+            this.logVerbose("Failed to fetch album art from Cover Art Archive:", error);
+          }
+        }
+        const track = {
+          name: latestListen.track_metadata.track_name,
+          artist: latestListen.track_metadata.artist_name,
+          album: latestListen.track_metadata.release_name || "",
+          albumArt,
+          url: latestListen.track_metadata.additional_info?.origin_url || `https://listenbrainz.org/player/${latestListen.track_metadata.additional_info?.recording_mbid || `${encodeURIComponent(latestListen.track_metadata.artist_name)}/${encodeURIComponent(latestListen.track_metadata.track_name)}`}`,
+          date: isNowPlaying ? "now" : new Date(trackTimestamp * 1e3).toISOString(),
+          nowPlaying: isNowPlaying,
+          loved: false,
+          from: trackTimestamp,
+          to: endTime,
+          duration
+        };
+        this.logVerbose("Processed track:", track);
+        this.log(
+          `${isNowPlaying ? "Now playing" : "Last played"}:`,
+          `${track.artist} - ${track.name}`
+        );
+        return track;
+      } catch (error) {
+        this.logError("Failed to fetch latest listen:", error);
+        throw error;
+      }
+    }
+    getErrorMessage(error) {
+      if (error.error) {
+        return error.error;
+      }
+      if (error.message) {
+        return error.message;
+      }
+      return error.toString() || "Unknown error";
+    }
+  };
+
+  // src/services/ServiceFactory.ts
+  var ServiceFactory = class _ServiceFactory {
+    static instance;
+    serviceInstances;
+    constructor() {
+      this.serviceInstances = /* @__PURE__ */ new Map();
+    }
+    static getInstance() {
+      if (!_ServiceFactory.instance) {
+        _ServiceFactory.instance = new _ServiceFactory();
+      }
+      return _ServiceFactory.instance;
+    }
+    getService(serviceType) {
+      if (!this.serviceInstances) {
+        this.serviceInstances = /* @__PURE__ */ new Map();
+      }
+      const type = serviceType || currentSettings.service;
+      if (!type) {
+        throw new Error(
+          "[ServiceFactory] No service type specified and no default service configured"
+        );
+      }
+      if (!this.serviceInstances.has(type)) {
+        this.serviceInstances.set(type, this.createService(type));
+      }
+      return this.serviceInstances.get(type);
+    }
+    getCurrentService() {
+      return this.getService(currentSettings.service);
+    }
+    createService(serviceType) {
+      switch (serviceType) {
+        case "lastfm":
+          return new LastFmService();
+        case "listenbrainz":
+          return new ListenBrainzService();
+        default:
+          throw new Error(
+            `[ServiceFactory] Unknown service type: ${serviceType}`
+          );
+      }
+    }
+    clearCache() {
+      if (this.serviceInstances) {
+        this.serviceInstances.clear();
+      } else {
+        this.serviceInstances = /* @__PURE__ */ new Map();
+      }
+    }
+    validateCurrentService() {
+      return this.getCurrentService().validateCredentials();
+    }
+    async testService(serviceType) {
+      try {
+        const service = this.getService(serviceType);
+        return await service.validateCredentials();
+      } catch (error) {
+        console.error(`[ServiceFactory] Failed to test ${serviceType}:`, error);
+        return false;
+      }
+    }
+    getSupportedServices() {
+      return ["lastfm", "listenbrainz"];
+    }
+    getServiceDisplayName(serviceType) {
+      const service = this.getService(serviceType);
+      return service.getServiceName();
+    }
+  };
+  var serviceFactory = ServiceFactory.getInstance();
+
+  // src/utils/time.ts
+  function formatDuration(seconds) {
+    if (!seconds || seconds < 0) return "0:00";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor(seconds % 3600 / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+    }
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  }
+  function getCurrentTimestamp() {
+    return Math.floor(Date.now() / 1e3);
+  }
+
+  // src/manager.ts
+  var log2 = (...message) => console.log("[Scrobble Plugin]", ...message);
+  var logError2 = (...message) => console.error("[Scrobble Plugin] Error:", ...message);
+  var logVerbose = (...message) => currentSettings.verboseLogging && console.log("[Scrobble Plugin] Verbose:", ...message);
+  var PluginManager = class _PluginManager {
+    static instance;
+    updateTimer;
+    reconnectTimer;
+    consecutiveFailures = 0;
+    isReconnecting = false;
+    currentActivity;
+    lastUpdateTime = 0;
+    constructor() {
+    }
+    static getInstance() {
+      if (!_PluginManager.instance) {
+        _PluginManager.instance = new _PluginManager();
+      }
+      return _PluginManager.instance;
+    }
+    // Check for new tracks and update Discord status when something changes
+    async updateActivity() {
+      if (pluginState.pluginStopped) {
+        log2("Plugin is stopped; skipping activity updates and clearing timers");
+        logVerbose("Plugin is stopped, skipping update");
+        try {
+          this.stopUpdates();
+          logVerbose("Update timers cleared due to stopped plugin");
+        } catch (e) {
+          logError2("Error while stopping updates for stopped plugin:", e);
+        }
+        return;
+      }
+      const serviceName = serviceFactory.getCurrentService().getServiceName();
+      logVerbose(`Fetching latest track from ${serviceName}...`);
+      let willUpdateRPC = false;
+      try {
+        if (currentSettings.ignoreList && currentSettings.ignoreList.length > 0) {
+          const ignoredActivity = SelfPresenceStore.findActivity((act) => {
+            if (!act.name) return false;
+            return currentSettings.ignoreList.some(
+              (ignoredApp) => act.name.toLowerCase().includes(ignoredApp.toLowerCase())
+            );
+          });
+          if (ignoredActivity) {
+            log2(`Ignored app (${ignoredActivity.name}) is currently active; clearing activity and skipping updates`);
+            logVerbose(
+              `Ignored app (${ignoredActivity.name}) is currently playing, clearing activity`
+            );
+            try {
+              setDebugInfo("ignoredActivity", ignoredActivity.name);
+            } catch (e) {
+              logVerbose("Failed to set debug info for ignored activity:", e);
+            }
+            clearActivity();
+            return;
+          }
+        }
+        incrementApiCall();
+        const lastTrack = await serviceFactory.getCurrentService().fetchLatestScrobble();
+        setDebugInfo("lastTrack", lastTrack);
+        if (!lastTrack.nowPlaying) {
+          log2("No currently playing track reported by service; clearing activity and skipping RPC update");
+          logVerbose("Track is not currently playing");
+          try {
+            setDebugInfo("lastTrack_nowPlaying", false);
+          } catch (e) {
+            logVerbose("Failed to set debug info for nowPlaying:", e);
+          }
+          clearActivity();
+          return;
+        }
+        if (pluginState.lastTrackUrl === lastTrack.url) {
+          log2("Track unchanged; skipping Discord RPC update");
+          logVerbose("Track hasn't changed");
+          recordSuccessfulUpdate();
+          this.consecutiveFailures = 0;
+          return;
+        }
+        willUpdateRPC = true;
+        log2(`\u{1F3B5} Track changed: ${lastTrack.artist} - ${lastTrack.name}`);
+        let activityTimestamps;
+        if (lastTrack.nowPlaying && currentSettings.showTimestamp && lastTrack.from && lastTrack.duration && lastTrack.duration > 0) {
+          const now = getCurrentTimestamp();
+          let startTime = lastTrack.from;
+          if (startTime < now - 3600) {
+            if (lastTrack.duration && lastTrack.duration > 0) {
+              const estimatedElapsed = Math.min(lastTrack.duration * 0.1, 30);
+              startTime = now - estimatedElapsed;
+            } else {
+              startTime = now;
+            }
+            logVerbose("had to estimate start time");
+          }
+          activityTimestamps = {
+            start: startTime * 1e3
+          };
+          if (lastTrack.to) {
+            activityTimestamps.end = lastTrack.to * 1e3;
+          }
+        }
+        logVerbose(
+          `\u{1F3AF} Preparing RPC update for: ${lastTrack.artist} - ${lastTrack.name}`
+        );
+        const activity = {
+          name: currentSettings.appName || constants_default.DEFAULT_APP_NAME,
+          flags: 0,
+          type: currentSettings.listeningTo ? 2 /* LISTENING */ : 0 /* PLAYING */,
+          details: lastTrack.name,
+          state: `${lastTrack.artist}`,
+          status_display_type: 1,
+          application_id: constants_default.APPLICATION_ID
+        };
+        if (activity.name.includes("{{")) {
+          const variables = {
+            artist: lastTrack.artist,
+            name: lastTrack.name,
+            album: lastTrack.album,
+            service: serviceName
+          };
+          for (const [key, value] of Object.entries(variables)) {
+            activity.name = activity.name.replace(
+              new RegExp(`{{${key}}}`, "g"),
+              value || ""
+            );
+          }
+        }
+        if (activityTimestamps) {
+          activity.timestamps = activityTimestamps;
+          logVerbose("Timestamps set:", {
+            start: new Date(activityTimestamps.start).toISOString(),
+            end: activityTimestamps.end ? new Date(activityTimestamps.end).toISOString() : "none",
+            duration: lastTrack.duration ? formatDuration(lastTrack.duration) : "unknown"
+          });
+        }
+        if (lastTrack.album || lastTrack.albumArt) {
+          const assetUrls = lastTrack.albumArt ? [lastTrack.albumArt] : [];
+          const assets = await fetchAsset(assetUrls);
+          let largeImageAsset = assets[0];
+          if (largeImageAsset) {
+            activity.assets = {
+              large_image: largeImageAsset
+            };
+            if (currentSettings.showLargeText) {
+              let largeText = "";
+              if (currentSettings.showAlbumInTooltip && lastTrack.album) {
+                largeText += `on ${lastTrack.album}`;
+              }
+              if (currentSettings.showDurationInTooltip && lastTrack.duration) {
+                const durationText = formatDuration(lastTrack.duration);
+                if (largeText) {
+                  largeText += ` \u2022 ${durationText}`;
+                } else {
+                  largeText = durationText;
+                }
+              }
+              if (largeText) {
+                activity.assets.large_text = largeText;
+              }
+            }
+            logVerbose("Album art set:", largeImageAsset);
+            if (activity.assets.large_text) {
+              logVerbose("Tooltip text set:", activity.assets.large_text);
+            }
+          } else if (lastTrack.album && currentSettings.showLargeText && currentSettings.showAlbumInTooltip) {
+            activity.assets = {
+              large_text: `on ${lastTrack.album}`
+            };
+          }
+        }
+        logVerbose("Setting Discord activity:", activity);
+        setDebugInfo("lastActivity", activity);
+        await sendRequest(activity);
+        pluginState.lastTrackUrl = lastTrack.url;
+        this.currentActivity = activity;
+        pluginState.lastActivity = activity;
+        this.consecutiveFailures = 0;
+        this.lastUpdateTime = getCurrentTimestamp();
+        recordSuccessfulUpdate();
+        log2(
+          `\u2705 RPC updated successfully: ${lastTrack.artist} - ${lastTrack.name}`
+        );
+      } catch (error) {
+        logError2("Update failed:", error);
+        try {
+          recordServiceError(currentSettings.service, error.message);
+        } catch (e) {
+          logError2("Failed to record service error:", e);
+        }
+        try {
+          setDebugInfo("lastUpdateError", {
+            message: error.message,
+            service: currentSettings.service,
+            lastTrackUrl: pluginState.lastTrackUrl
+          });
+        } catch (e) {
+          logVerbose("Failed to set debug info for last update error:", e);
+        }
+        this.handleError(error);
+      }
+    }
+    handleError(error) {
+      this.consecutiveFailures++;
+      setDebugInfo("lastError", error);
+      logError2(
+        `Failure ${this.consecutiveFailures}/${constants_default.MAX_RETRY_ATTEMPTS}:`,
+        error.message
+      );
+      if (this.consecutiveFailures >= constants_default.MAX_RETRY_ATTEMPTS) {
+        logError2("Max retry attempts reached, initiating reconnection...");
+        this.startReconnection();
+      }
+    }
+    startReconnection() {
+      if (this.isReconnecting) return;
+      this.isReconnecting = true;
+      this.stopUpdates();
+      log2("Starting reconnection process...");
+      this.reconnectTimer = setInterval(() => {
+        log2("Attempting to reconnect...");
+        this.initialize().then(() => {
+          log2("Reconnection successful!");
+          this.stopReconnection();
+        }).catch((error) => {
+          logError2("Reconnection attempt failed:", error.message);
+        });
+      }, constants_default.RETRY_DELAY);
+    }
+    stopReconnection() {
+      try {
+        if (this.reconnectTimer) {
+          clearInterval(this.reconnectTimer);
+          this.reconnectTimer = void 0;
+        }
+        this.isReconnecting = false;
+        this.consecutiveFailures = 0;
+      } catch (error) {
+        console.error("[Scrobble Plugin] Reconnection cleanup error:", error);
+      }
+    }
+    // clean up all timers
+    stopUpdates() {
+      try {
+        if (this.updateTimer) {
+          clearInterval(this.updateTimer);
+          this.updateTimer = void 0;
+        }
+      } catch (error) {
+        console.error("[Scrobble Plugin] Timer cleanup error:", error);
+      }
+    }
+    // start everything up
+    async initialize() {
+      if (pluginState.pluginStopped) {
+        throw new Error("Plugin is stopped");
+      }
+      const serviceName = serviceFactory.getCurrentService().getServiceName();
+      log2(`Initializing with ${serviceName}...`);
+      try {
+        const isValid = await serviceFactory.validateCurrentService();
+        if (!isValid) {
+          throw new Error(`Invalid credentials for ${serviceName}`);
+        }
+        log2(`${serviceName} credentials validated successfully`);
+      } catch (error) {
+        logError2(`Failed to validate ${serviceName} credentials:`, error);
+        throw error;
+      }
+      this.stopUpdates();
+      log2("\u{1F3B5} checking for already playing songs...");
+      await this.updateActivity();
+      const interval = Math.max(
+        (Number(currentSettings.timeInterval) || constants_default.DEFAULT_SETTINGS.timeInterval) * 1e3,
+        constants_default.MIN_UPDATE_INTERVAL * 1e3
+      );
+      this.updateTimer = setInterval(() => this.updateActivity(), interval);
+      log2(
+        `Update timer started with interval: ${interval}ms (${interval / 1e3}s)`
+      );
+    }
+    // stop everything and clean up
+    stop() {
+      if (pluginState.pluginStopped) {
+        return;
+      }
+      log2("Stopping plugin...");
+      pluginState.pluginStopped = true;
+      try {
+        this.stopUpdates();
+        this.stopReconnection();
+        clearActivity();
+        log2("Plugin stopped successfully");
+      } catch (error) {
+        console.error("[Scrobble Plugin] Stop error:", error);
+      }
+    }
+    // change to a different scrobble service
+    async switchService(newService) {
+      if (pluginState.pluginStopped) {
+        return;
+      }
+      log2(`Switching to ${newService}...`);
+      const wasRunning = !pluginState.pluginStopped;
+      this.stop();
+      try {
+        serviceFactory.clearCache();
+        pluginState.lastTrackUrl = void 0;
+        this.currentActivity = void 0;
+        this.lastUpdateTime = 0;
+        if (wasRunning) {
+          pluginState.pluginStopped = false;
+          await this.initialize();
+        }
+      } catch (error) {
+        logError2("Failed to switch service:", error);
+      }
+    }
+    // get info about what's currently happening
+    getStatus() {
+      const serviceName = serviceFactory.getCurrentService().getServiceName();
+      return {
+        running: !pluginState.pluginStopped,
+        service: serviceName,
+        consecutiveFailures: this.consecutiveFailures,
+        isReconnecting: this.isReconnecting,
+        lastTrackUrl: pluginState.lastTrackUrl,
+        updateInterval: this.updateTimer ? "Active" : "Inactive"
+      };
+    }
+  };
+  var manager = PluginManager.getInstance();
+  var initialize = () => manager.initialize();
+  var stop = () => manager.stop();
+  var switchService = (service) => manager.switchService(service);
+
+  // src/ui/pages/Settings.tsx
+  var import_vendetta8 = p;
+  var import_storage8 = Pt;
+  var import_common9 = r;
+  var import_common10 = r;
+
+  // src/ui/pages/pages/components/TableComponents.tsx
+  var import_metro2 = x;
+  var { ScrollView } = (0, import_metro2.findByProps)("ScrollView");
+  var {
+    TableRowGroup,
+    TableSwitchRow,
+    TableCheckboxRow,
+    Stack,
+    TableRow
+  } = (0, import_metro2.findByProps)(
+    "TableSwitchRow",
+    "TableCheckboxRow",
+    "TableRowGroup",
+    "Stack",
+    "TableRow"
+  );
+  var { TextInput } = (0, import_metro2.findByProps)("TextInput");
+
+  // src/ui/pages/pages/LastFmSettingsPage.tsx
+  var import_common2 = r;
+  var import_storage = Pt;
+  var import_react_native = ne;
+  var import_toasts = D;
+  var import_assets = re;
+  var import_vendetta = p;
+  function LastFmSettingsPage() {
+    (0, import_storage.useProxy)(import_vendetta.plugin.storage);
+    const [, forceUpdate] = import_common2.React.useReducer((x) => x + 1, 0);
+    const testConnection = async () => {
+      (0, import_toasts.showToast)("Testing Last.fm connection...", (0, import_assets.getAssetIDByName)("ClockIcon"));
+      try {
+        const isValid = await serviceFactory2.testService("lastfm");
+        if (isValid) {
+          (0, import_toasts.showToast)(
+            "\u2705 Last.fm connection successful!",
+            (0, import_assets.getAssetIDByName)("CheckIcon")
+          );
+        } else {
+          (0, import_toasts.showToast)("\u274C Last.fm connection failed", (0, import_assets.getAssetIDByName)("XIcon"));
+        }
+      } catch (error) {
+        (0, import_toasts.showToast)("\u274C Connection error", (0, import_assets.getAssetIDByName)("XIcon"));
+      }
+    };
+    return /* @__PURE__ */ import_common2.React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { padding: 10 } }, /* @__PURE__ */ import_common2.React.createElement(Stack, { spacing: 8 }, /* @__PURE__ */ import_common2.React.createElement(TableRowGroup, { title: "Credentials" }, /* @__PURE__ */ import_common2.React.createElement(Stack, { spacing: 4 }, /* @__PURE__ */ import_common2.React.createElement(
+      TextInput,
+      {
+        placeholder: "Last.fm Username",
+        value: getStorage("username"),
+        onChange: (v) => {
+          setStorage("username", v);
+          forceUpdate();
+        },
+        isClearable: true
+      }
+    ), /* @__PURE__ */ import_common2.React.createElement(
+      TextInput,
+      {
+        placeholder: "Last.fm API Key",
+        value: getStorage("apiKey"),
+        onChange: (v) => {
+          setStorage("apiKey", v);
+          forceUpdate();
+        },
+        secureTextEntry: true,
+        isClearable: true
+      }
+    ))), /* @__PURE__ */ import_common2.React.createElement(TableRowGroup, { title: "Actions" }, /* @__PURE__ */ import_common2.React.createElement(
+      TableRow,
+      {
+        label: "Test Connection",
+        subLabel: "Verify your Last.fm credentials",
+        trailing: /* @__PURE__ */ import_common2.React.createElement(TableRow.Arrow, null),
+        onPress: testConnection
+      }
+    ), /* @__PURE__ */ import_common2.React.createElement(
+      TableRow,
+      {
+        label: "Get API Key",
+        subLabel: "Create a Last.fm API key at last.fm/api/account/create",
+        trailing: /* @__PURE__ */ import_common2.React.createElement(TableRow.Arrow, null),
+        onPress: async () => {
+          try {
+            await import_react_native.Linking.openURL("https://www.last.fm/api/account/create");
+          } catch (error) {
+            console.error("Failed to open Last.fm API URL:", error);
+            (0, import_toasts.showToast)(
+              "Failed to open web browser. Please visit: https://www.last.fm/api/account/create",
+              (0, import_assets.getAssetIDByName)("XIcon")
+            );
+          }
+        }
+      }
+    ))));
+  }
+
+  // src/ui/pages/pages/ListenBrainzSettingsPage.tsx
+  var import_common3 = r;
+  var import_storage2 = Pt;
+  var import_react_native2 = ne;
+  var import_toasts2 = D;
+  var import_assets2 = re;
+  var import_vendetta2 = p;
+  function ListenBrainzSettingsPage() {
+    (0, import_storage2.useProxy)(import_vendetta2.plugin.storage);
+    const [, forceUpdate] = import_common3.React.useReducer((x) => x + 1, 0);
+    const testConnection = async () => {
+      (0, import_toasts2.showToast)(
+        "Testing ListenBrainz connection...",
+        (0, import_assets2.getAssetIDByName)("ClockIcon")
+      );
+      try {
+        const isValid = await serviceFactory2.testService("listenbrainz");
+        if (isValid) {
+          (0, import_toasts2.showToast)(
+            "\u2705 ListenBrainz connection successful!",
+            (0, import_assets2.getAssetIDByName)("CheckIcon")
+          );
+        } else {
+          (0, import_toasts2.showToast)(
+            "\u274C ListenBrainz connection failed",
+            (0, import_assets2.getAssetIDByName)("XIcon")
+          );
+        }
+      } catch (error) {
+        (0, import_toasts2.showToast)("\u274C Connection error", (0, import_assets2.getAssetIDByName)("XIcon"));
+      }
+    };
+    return /* @__PURE__ */ import_common3.React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { padding: 10 } }, /* @__PURE__ */ import_common3.React.createElement(Stack, { spacing: 8 }, /* @__PURE__ */ import_common3.React.createElement(TableRowGroup, { title: "Credentials" }, /* @__PURE__ */ import_common3.React.createElement(Stack, { spacing: 4 }, /* @__PURE__ */ import_common3.React.createElement(
+      TextInput,
+      {
+        placeholder: "ListenBrainz Username",
+        value: getStorage("listenbrainzUsername"),
+        onChange: (v) => {
+          setStorage("listenbrainzUsername", v);
+          forceUpdate();
+        },
+        isClearable: true
+      }
+    ), /* @__PURE__ */ import_common3.React.createElement(
+      TextInput,
+      {
+        placeholder: "ListenBrainz Token",
+        value: getStorage("listenbrainzToken"),
+        onChange: (v) => {
+          setStorage("listenbrainzToken", v);
+          forceUpdate();
+        },
+        secureTextEntry: true,
+        isClearable: true
+      }
+    ))), /* @__PURE__ */ import_common3.React.createElement(TableRowGroup, { title: "Actions" }, /* @__PURE__ */ import_common3.React.createElement(
+      TableRow,
+      {
+        label: "Test Connection",
+        subLabel: "Verify your ListenBrainz credentials",
+        trailing: /* @__PURE__ */ import_common3.React.createElement(TableRow.Arrow, null),
+        onPress: testConnection
+      }
+    ), /* @__PURE__ */ import_common3.React.createElement(
+      TableRow,
+      {
+        label: "Get User Token",
+        subLabel: "Get your ListenBrainz user token at listenbrainz.org/settings/",
+        trailing: /* @__PURE__ */ import_common3.React.createElement(TableRow.Arrow, null),
+        onPress: async () => {
+          try {
+            await import_react_native2.Linking.openURL("https://listenbrainz.org/settings/");
+          } catch (error) {
+            console.error(
+              "Failed to open ListenBrainz settings URL:",
+              error
+            );
+            (0, import_toasts2.showToast)(
+              "Failed to open web browser. Please visit: https://listenbrainz.org/settings/",
+              (0, import_assets2.getAssetIDByName)("XIcon")
+            );
+          }
+        }
+      }
+    ))));
+  }
+
+  // src/ui/pages/pages/DisplaySettingsPage.tsx
+  var import_common4 = r;
+  var import_storage3 = Pt;
+  var import_vendetta3 = p;
+  function DisplaySettingsPage() {
+    (0, import_storage3.useProxy)(import_vendetta3.plugin.storage);
+    const [, forceUpdate] = import_common4.React.useReducer((x) => x + 1, 0);
+    return /* @__PURE__ */ import_common4.React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { padding: 10 } }, /* @__PURE__ */ import_common4.React.createElement(Stack, { spacing: 8 }, /* @__PURE__ */ import_common4.React.createElement(TableRowGroup, { title: "Activity Display" }, /* @__PURE__ */ import_common4.React.createElement(Stack, { spacing: 4 }, /* @__PURE__ */ import_common4.React.createElement(
+      TextInput,
+      {
+        placeholder: `App Name (Default: ${constants_default.DEFAULT_SETTINGS.appName})`,
+        value: getStorage("appName", constants_default.DEFAULT_SETTINGS.appName),
+        onChange: (v) => {
+          setStorage("appName", v);
+          forceUpdate();
+        },
+        isClearable: true
+      }
+    ), /* @__PURE__ */ import_common4.React.createElement(
+      TextInput,
+      {
+        placeholder: `Update Interval (Default: ${constants_default.DEFAULT_SETTINGS.timeInterval}s)`,
+        value: String(
+          getStorage(
+            "timeInterval",
+            constants_default.DEFAULT_SETTINGS.timeInterval
+          )
+        ),
+        onChange: (v) => {
+          const interval = Number(v);
+          if (interval >= constants_default.MIN_UPDATE_INTERVAL) {
+            setStorage("timeInterval", interval);
+            forceUpdate();
+          }
+        },
+        keyboardType: "numeric",
+        isClearable: true
+      }
+    ))), /* @__PURE__ */ import_common4.React.createElement(TableRowGroup, { title: "About Display Settings" }, /* @__PURE__ */ import_common4.React.createElement(
+      TableRow,
+      {
+        label: "App Name",
+        subLabel: "The name shown in Discord for your activity"
+      }
+    ), /* @__PURE__ */ import_common4.React.createElement(
+      TableRow,
+      {
+        label: "Update Interval",
+        subLabel: "How often the plugin checks for new tracks (in seconds)"
+      }
+    ), /* @__PURE__ */ import_common4.React.createElement(
+      TableRow,
+      {
+        label: "Minimum Interval",
+        subLabel: `The plugin will never check more frequently than ${constants_default.MIN_UPDATE_INTERVAL} seconds`
+      }
+    ))));
+  }
+
+  // src/ui/pages/pages/RPCCustomizationSettingsPage.tsx
+  var import_common6 = r;
+  var import_storage5 = Pt;
+  var import_vendetta5 = p;
+
+  // src/ui/pages/pages/components/RPCPreview.tsx
+  var import_common5 = r;
+  var import_storage4 = Pt;
+  var import_vendetta4 = p;
+  function RPCPreview() {
+    (0, import_storage4.useProxy)(import_vendetta4.plugin.storage);
+    const [previewTrack, setPreviewTrack] = import_common5.React.useState(null);
+    const [isLoading, setIsLoading] = import_common5.React.useState(true);
+    const [currentProgress, setCurrentProgress] = import_common5.React.useState(0);
+    const fallbackTrack = {
+      name: "Bohemian Rhapsody",
+      artist: "Queen",
+      album: "A Night at the Opera",
+      image: null,
+      nowPlaying: true,
+      duration: 354,
+      startTime: Math.floor(Date.now() / 1e3) - 120
+    };
+    import_common5.React.useEffect(() => {
+      const fetchPreviewData = async () => {
+        const username = getStorage("listenbrainzUsername");
+        if (!username) {
+          setPreviewTrack(fallbackTrack);
+          setIsLoading(false);
+          return;
+        }
+        try {
+          setIsLoading(true);
+          const token = getStorage("listenbrainzToken");
+          const headers = {
+            "Content-Type": "application/json"
+          };
+          if (token) headers["Authorization"] = `Token ${token}`;
+          let trackData = null;
+          try {
+            const playingNowRes = await fetch(
+              `https://api.listenbrainz.org/1/user/${encodeURIComponent(username)}/playing-now`,
+              { headers }
+            );
+            const playingNowData = await playingNowRes.json();
+            const listens = playingNowData?.listens || playingNowData?.payload?.listens || playingNowData?.data?.listens;
+            if (listens && listens.length > 0) {
+              trackData = listens[0];
+              trackData.playing_now = true;
+            }
+          } catch (e) {
+          }
+          if (!trackData) {
+            const recentRes = await fetch(
+              `https://api.listenbrainz.org/1/user/${encodeURIComponent(username)}/listens?count=1`,
+              { headers }
+            );
+            const recentData = await recentRes.json();
+            const listens = recentData?.listens || recentData?.payload?.listens || recentData?.data?.listens;
+            if (listens && listens.length > 0) {
+              trackData = listens[0];
+            }
+          }
+          if (trackData) {
+            const meta = trackData.track_metadata;
+            const duration = meta.additional_info?.duration_ms ? Math.floor(meta.additional_info.duration_ms / 1e3) : 180;
+            let image = null;
+            if (meta.additional_info?.release_mbid) {
+              try {
+                const coverUrl = `https://coverartarchive.org/release/${meta.additional_info.release_mbid}/front`;
+                const coverRes = await fetch(coverUrl, {
+                  method: "HEAD",
+                  redirect: "follow"
+                });
+                if (coverRes.ok) image = coverUrl;
+              } catch (e) {
+              }
+            }
+            if (!image && getStorage("username") && getStorage("apiKey")) {
+              try {
+                const lfmRes = await fetch(
+                  `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${getStorage("apiKey")}&artist=${encodeURIComponent(meta.artist_name)}&track=${encodeURIComponent(meta.track_name)}&format=json`
+                );
+                const lfmData = await lfmRes.json();
+                const images = lfmData?.track?.album?.image;
+                if (images && images.length > 0) {
+                  for (let i = images.length - 1; i >= 0; i--) {
+                    if (images[i]["#text"]) {
+                      image = images[i]["#text"];
+                      break;
+                    }
+                  }
+                }
+              } catch (e) {
+              }
+            }
+            setPreviewTrack({
+              name: meta.track_name || "Unknown Track",
+              artist: meta.artist_name || "Unknown Artist",
+              album: meta.release_name || "",
+              image,
+              nowPlaying: Boolean(trackData.playing_now),
+              duration,
+              startTime: trackData.playing_now ? Math.floor(Date.now() / 1e3) - 60 : null
+            });
+          } else {
+            setPreviewTrack(fallbackTrack);
+          }
+        } catch (error) {
+          console.error("Failed to fetch ListenBrainz preview:", error);
+          setPreviewTrack(fallbackTrack);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchPreviewData();
+    }, [getStorage("listenbrainzUsername"), getStorage("listenbrainzToken")]);
+    import_common5.React.useEffect(() => {
+      if (!previewTrack?.nowPlaying || !previewTrack.duration) {
+        return;
+      }
+      const interval = setInterval(() => {
+        if (previewTrack.startTime && previewTrack.duration) {
+          const now = Math.floor(Date.now() / 1e3);
+          const elapsed = now - previewTrack.startTime;
+          const progress = Math.min(elapsed / previewTrack.duration, 1);
+          setCurrentProgress(progress);
+        }
+      }, 1e3);
+      return () => clearInterval(interval);
+    }, [previewTrack]);
+    const formatTime = (seconds) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, "0")}`;
+    };
+    const getPreviewText = () => {
+      let text = "";
+      if (getStorage("showAlbumInTooltip") && previewTrack?.album) {
+        text += `on ${previewTrack.album}`;
+      }
+      if (getStorage("showDurationInTooltip") && previewTrack?.duration) {
+        const durationText = ` \u2022 ${formatTime(previewTrack.duration)}`;
+        if (text) {
+          text += durationText;
+        } else {
+          text = formatTime(previewTrack.duration);
+        }
+      }
+      return text || null;
+    };
+    const getCurrentProgressData = () => {
+      if (!previewTrack?.duration) return { current: 0, total: 0, progress: 0 };
+      if (previewTrack.nowPlaying) {
+        const current = currentProgress * previewTrack.duration;
+        return {
+          current,
+          total: previewTrack.duration,
+          progress: currentProgress
+        };
+      } else {
+        return {
+          current: previewTrack.duration * 0.3,
+          total: previewTrack.duration,
+          progress: 0.3
+        };
+      }
+    };
+    const activityType = getStorage("listeningTo") ? "Listening to" : "Playing";
+    const appName = getStorage("appName") || "Music";
+    const showLargeText = getStorage("showLargeText", true);
+    const showTimestamp = getStorage("showTimestamp", false);
+    const hasDuration = Boolean(previewTrack?.duration);
+    if (isLoading) {
+      return /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.container }, /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.loadingContent }, /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.loadingSpinner }), /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.loadingText }, "Loading preview...")));
+    }
+    if (!previewTrack) {
+      return /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.container }, /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.centeredText }, "Unable to load preview"));
+    }
+    const progressData = getCurrentProgressData();
+    const previewText = getPreviewText();
+    return /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.previewContainer }, /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.header }, /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.activityType }, activityType, " ", appName), /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.rpcPreviewText, numberOfLines: 1 }, "RPC Preview")), /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.content }, previewTrack.image ? /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.albumArt }, /* @__PURE__ */ import_common5.React.createElement(
+      import_common5.ReactNative.Image,
+      {
+        source: { uri: previewTrack.image },
+        style: styles.albumImage,
+        resizeMode: "cover"
+      }
+    )) : null, /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.trackInfo }, /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.trackName, numberOfLines: 1 }, previewTrack.name), /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.artistName, numberOfLines: 1 }, previewTrack.artist), showLargeText && previewText && /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.tooltipText, numberOfLines: 1 }, previewText), showTimestamp && hasDuration ? /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.progressContainer }, /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.timeText }, formatTime(progressData.current)), /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.View, { style: styles.progressBar }, /* @__PURE__ */ import_common5.React.createElement(
+      import_common5.ReactNative.View,
+      {
+        style: [
+          styles.progressFill,
+          { width: `${progressData.progress * 100}%` }
+        ]
+      }
+    )), /* @__PURE__ */ import_common5.React.createElement(import_common5.ReactNative.Text, { style: styles.timeText }, formatTime(progressData.total))) : null)));
+  }
+  var styles = import_common5.ReactNative.StyleSheet.create({
+    container: {
+      backgroundColor: "#1e1f22",
+      borderRadius: 12,
+      padding: 16,
+      marginHorizontal: 10,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: "#3a3c41",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 120
+    },
+    loadingContent: {
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    loadingSpinner: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: "#5865f2",
+      borderTopColor: "transparent",
+      marginBottom: 8
+    },
+    previewContainer: {
+      backgroundColor: "#1e1f22",
+      borderRadius: 12,
+      padding: 16,
+      marginHorizontal: 10,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: "#3a3c41"
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+      gap: 8
+    },
+    content: {
+      flexDirection: "row",
+      alignItems: "center"
+    },
+    albumArt: {
+      width: 80,
+      height: 80,
+      backgroundColor: "#2b2d31",
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 16,
+      borderWidth: 1,
+      borderColor: "#40444b",
+      overflow: "hidden",
+      flexShrink: 0
+    },
+    trackInfo: {
+      flex: 1,
+      minWidth: 0
+    },
+    progressContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 6
+    },
+    progressBar: {
+      flex: 1,
+      height: 2,
+      backgroundColor: "#2b2d31",
+      borderRadius: 3,
+      overflow: "hidden"
+    },
+    progressFill: {
+      height: 2,
+      backgroundColor: "#5865f2",
+      borderRadius: 3
+    },
+    loadingText: {
+      color: "#949ba4",
+      fontSize: 14,
+      fontWeight: "500"
+    },
+    centeredText: {
+      color: "#949ba4",
+      fontSize: 14,
+      fontWeight: "500",
+      textAlign: "center"
+    },
+    activityType: {
+      color: "#dbdee1",
+      fontSize: 14,
+      fontWeight: "600",
+      flex: 1
+    },
+    rpcPreviewText: {
+      color: "#80848e",
+      fontSize: 12,
+      fontStyle: "italic",
+      flexShrink: 0
+    },
+    albumImage: {
+      width: 80,
+      height: 80,
+      borderRadius: 12
+    },
+    trackName: {
+      color: "#ffffff",
+      fontSize: 16,
+      fontWeight: "700",
+      marginBottom: 4
+    },
+    artistName: {
+      color: "#b5bac1",
+      fontSize: 14,
+      fontWeight: "500",
+      marginBottom: 4
+    },
+    tooltipText: {
+      color: "#80848e",
+      fontSize: 12,
+      fontStyle: "italic",
+      marginBottom: 6
+    },
+    timeText: {
+      color: "#80848e",
+      fontSize: 11,
+      fontWeight: "500",
+      minWidth: 35,
+      textAlign: "center"
+    }
+  });
+
+  // src/ui/pages/pages/RPCCustomizationSettingsPage.tsx
+  function RPCCustomizationSettingsPage() {
+    (0, import_storage5.useProxy)(import_vendetta5.plugin.storage);
+    const [, forceUpdate] = import_common6.React.useReducer((x) => x + 1, 0);
+    const isListeningTo = getStorage(
+      "listeningTo",
+      constants_default.DEFAULT_SETTINGS.listeningTo
+    );
+    const showTimestamp = getStorage(
+      "showTimestamp",
+      constants_default.DEFAULT_SETTINGS.showTimestamp
+    );
+    const handleListeningToChange = () => {
+      const newValue = !isListeningTo;
+      setStorage("listeningTo", newValue);
+      if (!newValue && showTimestamp) {
+        setStorage("showTimestamp", false);
+      }
+      forceUpdate();
+    };
+    const handleTimestampChange = () => {
+      if (!isListeningTo) return;
+      setStorage("showTimestamp", !showTimestamp);
+      forceUpdate();
+    };
+    return /* @__PURE__ */ import_common6.React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { padding: 10 } }, /* @__PURE__ */ import_common6.React.createElement(RPCPreview, null), /* @__PURE__ */ import_common6.React.createElement(Stack, { spacing: 8 }, /* @__PURE__ */ import_common6.React.createElement(TableRowGroup, { title: "RPC Display Options" }, /* @__PURE__ */ import_common6.React.createElement(
+      TableCheckboxRow,
+      {
+        label: "Show as Listening",
+        subLabel: "Display as 'Listening to' instead of 'Playing'",
+        checked: isListeningTo,
+        onPress: handleListeningToChange
+      }
+    ), /* @__PURE__ */ import_common6.React.createElement(
+      TableCheckboxRow,
+      {
+        label: "Show Tooltip Text",
+        subLabel: "Show album name and track duration in Discord activity tooltip",
+        checked: getStorage("showLargeText", true),
+        onPress: () => {
+          const current = getStorage("showLargeText", true);
+          setStorage("showLargeText", !current);
+          forceUpdate();
+        }
+      }
+    ), !isListeningTo && /* @__PURE__ */ import_common6.React.createElement(
+      TableRow,
+      {
+        label: "Timestamp Unavailable",
+        subLabel: "Enable 'Show as Listening' to use timestamp feature",
+        disabled: true,
+        dimmed: true
+      }
+    ), /* @__PURE__ */ import_common6.React.createElement(
+      TableCheckboxRow,
+      {
+        label: "Show Timestamp",
+        subLabel: "Display track progress (only shows when duration is available)",
+        checked: showTimestamp,
+        onPress: handleTimestampChange,
+        disabled: !isListeningTo
+      }
+    ), /* @__PURE__ */ import_common6.React.createElement(
+      TableCheckboxRow,
+      {
+        label: "Show Album in Tooltip",
+        subLabel: "Include album name in the tooltip text",
+        checked: getStorage("showAlbumInTooltip", true),
+        onPress: () => {
+          const current = getStorage("showAlbumInTooltip", true);
+          setStorage("showAlbumInTooltip", !current);
+          forceUpdate();
+        }
+      }
+    ), /* @__PURE__ */ import_common6.React.createElement(
+      TableCheckboxRow,
+      {
+        label: "Show Duration in Tooltip",
+        subLabel: "Include track duration in the tooltip text",
+        checked: getStorage("showDurationInTooltip", true),
+        onPress: () => {
+          const current = getStorage("showDurationInTooltip", true);
+          setStorage("showDurationInTooltip", !current);
+          forceUpdate();
+        }
+      }
+    ))));
+  }
+
+  // src/ui/pages/pages/IgnoreListSettingsPage.tsx
+  var import_common7 = r;
+  var import_storage6 = Pt;
+  var import_vendetta6 = p;
+  var import_toasts3 = D;
+  var import_assets3 = re;
+  function IgnoreListSettingsPage() {
+    (0, import_storage6.useProxy)(import_vendetta6.plugin.storage);
+    const [, forceUpdate] = import_common7.React.useReducer((x) => x + 1, 0);
+    const [newAppName, setNewAppName] = import_common7.React.useState("");
+    const addAppToIgnoreList = () => {
+      if (!newAppName.trim()) {
+        (0, import_toasts3.showToast)("Please enter an app name", (0, import_assets3.getAssetIDByName)("Small"));
+        return;
+      }
+      const ignoreList = getStorage("ignoreList", []);
+      if (!ignoreList.includes(newAppName.trim())) {
+        setStorage("ignoreList", [...ignoreList, newAppName.trim()]);
+        setNewAppName("");
+        forceUpdate();
+        (0, import_toasts3.showToast)("App added to ignore list", (0, import_assets3.getAssetIDByName)("Check"));
+      } else {
+        (0, import_toasts3.showToast)("App already in ignore list", (0, import_assets3.getAssetIDByName)("Warning"));
+      }
+    };
+    const removeAppFromIgnoreList = (appName) => {
+      const ignoreList = getStorage("ignoreList", []);
+      setStorage(
+        "ignoreList",
+        ignoreList.filter((app) => app !== appName)
+      );
+      forceUpdate();
+      (0, import_toasts3.showToast)("App removed from ignore list", (0, import_assets3.getAssetIDByName)("Check"));
+    };
+    return /* @__PURE__ */ import_common7.React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { padding: 10 } }, /* @__PURE__ */ import_common7.React.createElement(Stack, { spacing: 8 }, /* @__PURE__ */ import_common7.React.createElement(TableRowGroup, { title: "Add App to Ignore" }, /* @__PURE__ */ import_common7.React.createElement(Stack, { spacing: 4 }, /* @__PURE__ */ import_common7.React.createElement(
+      TextInput,
+      {
+        placeholder: "Enter app name",
+        value: newAppName,
+        onChange: setNewAppName,
+        isClearable: true,
+        onSubmitEditing: addAppToIgnoreList,
+        returnKeyType: "done"
+      }
+    ))), /* @__PURE__ */ import_common7.React.createElement(TableRowGroup, null, /* @__PURE__ */ import_common7.React.createElement(
+      TableRow,
+      {
+        label: "Add to Ignore List",
+        subLabel: "Add the current app name to your ignore list",
+        trailing: /* @__PURE__ */ import_common7.React.createElement(TableRow.Arrow, null),
+        onPress: addAppToIgnoreList
+      }
+    )), getStorage("ignoreList", []).length > 0 && /* @__PURE__ */ import_common7.React.createElement(TableRowGroup, { title: "Ignored Apps" }, getStorage("ignoreList", []).map(
+      (appName, index) => /* @__PURE__ */ import_common7.React.createElement(
+        TableRow,
+        {
+          key: index,
+          label: appName,
+          trailing: /* @__PURE__ */ import_common7.React.createElement(
+            import_common7.ReactNative.TouchableOpacity,
+            {
+              onPress: () => removeAppFromIgnoreList(appName),
+              style: {
+                padding: 8,
+                backgroundColor: "#ff4d4d",
+                borderRadius: 12,
+                width: 24,
+                height: 24,
+                justifyContent: "center",
+                alignItems: "center"
+              }
+            },
+            /* @__PURE__ */ import_common7.React.createElement(
+              import_common7.ReactNative.Image,
+              {
+                source: (0, import_assets3.getAssetIDByName)("TrashIcon"),
+                style: { width: 14, height: 14, tintColor: "#ffffff" }
+              }
+            )
+          )
+        }
+      )
+    )), /* @__PURE__ */ import_common7.React.createElement(TableRowGroup, { title: "About Ignore List" }, /* @__PURE__ */ import_common7.React.createElement(
+      TableRow,
+      {
+        label: "How it Works",
+        subLabel: "When any app in your ignore list is active, your music status will be hidden"
+      }
+    ), /* @__PURE__ */ import_common7.React.createElement(
+      TableRow,
+      {
+        label: "Detection",
+        subLabel: "Apps are detected by their Discord activity name"
+      }
+    ), /* @__PURE__ */ import_common7.React.createElement(
+      TableRow,
+      {
+        label: "Examples",
+        subLabel: "Spotify, YouTube Music, Kizzy, Metrolist, echo"
+      }
+    ))));
+  }
+
+  // src/ui/pages/pages/LoggingSettingsPage.tsx
+  var import_common8 = r;
+  var import_storage7 = Pt;
+  var import_vendetta7 = p;
+  function LoggingSettingsPage() {
+    (0, import_storage7.useProxy)(import_vendetta7.plugin.storage);
+    const [, forceUpdate] = import_common8.React.useReducer((x) => x + 1, 0);
+    return /* @__PURE__ */ import_common8.React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { padding: 10 } }, /* @__PURE__ */ import_common8.React.createElement(Stack, { spacing: 8 }, /* @__PURE__ */ import_common8.React.createElement(TableRowGroup, { title: "Logging Options" }, /* @__PURE__ */ import_common8.React.createElement(
+      TableSwitchRow,
+      {
+        label: "Verbose Logging",
+        subLabel: "Enable detailed console logging for debugging",
+        value: getStorage(
+          "verboseLogging",
+          constants_default.DEFAULT_SETTINGS.verboseLogging
+        ),
+        onValueChange: (value) => {
+          setStorage("verboseLogging", value);
+          forceUpdate();
+        }
+      }
+    )), /* @__PURE__ */ import_common8.React.createElement(TableRowGroup, { title: "Debug Information" }, /* @__PURE__ */ import_common8.React.createElement(
+      TableRow,
+      {
+        label: "Console Logging",
+        subLabel: "Logs are written to the browser/app console when verbose is enabled"
+      }
+    ), /* @__PURE__ */ import_common8.React.createElement(
+      TableRow,
+      {
+        label: "Error Tracking",
+        subLabel: "Connection errors and API failures are automatically logged"
+      }
+    )), /* @__PURE__ */ import_common8.React.createElement(TableRowGroup, { title: "Log Information" }, /* @__PURE__ */ import_common8.React.createElement(
+      TableRow,
+      {
+        label: "API Calls",
+        subLabel: "All API requests are logged when verbose is enabled"
+      }
+    ), /* @__PURE__ */ import_common8.React.createElement(
+      TableRow,
+      {
+        label: "Track Updates",
+        subLabel: "Song changes and RPC updates are logged"
+      }
+    ), /* @__PURE__ */ import_common8.React.createElement(
+      TableRow,
+      {
+        label: "Error Details",
+        subLabel: "Connection errors and retries are logged"
+      }
+    ))));
+  }
+
+  // src/ui/pages/Settings.tsx
+  import_vendetta8.plugin.storage.username ??= "";
+  import_vendetta8.plugin.storage.apiKey ??= "";
+  import_vendetta8.plugin.storage.appName ??= "Music";
+  import_vendetta8.plugin.storage.timeInterval ??= 5;
+  import_vendetta8.plugin.storage.showTimestamp ??= true;
+  import_vendetta8.plugin.storage.listeningTo ??= true;
+  import_vendetta8.plugin.storage.verboseLogging ??= false;
+  import_vendetta8.plugin.storage.service ??= "listenbrainz";
+  import_vendetta8.plugin.storage.listenbrainzUsername ??= "";
+  import_vendetta8.plugin.storage.listenbrainzToken ??= "";
+  import_vendetta8.plugin.storage.addToSidebar ??= true;
+  import_vendetta8.plugin.storage.showLargeText ??= true;
+  import_vendetta8.plugin.storage.ignoreList ??= [];
+  import_vendetta8.plugin.storage.showAlbumInTooltip ??= true;
+  import_vendetta8.plugin.storage.showDurationInTooltip ??= true;
+  var getStorage = (k, fallback) => import_vendetta8.plugin.storage[k] ?? fallback;
+  var setStorage = (k, v) => import_vendetta8.plugin.storage[k] = v;
+  var ServiceFactory2 = class {
+    static getServiceDisplayName(service) {
+      switch (service) {
+        case "lastfm":
+          return "Last.fm";
+        case "listenbrainz":
+          return "ListenBrainz";
+        default:
+          return "Unknown";
+      }
+    }
+    static async testService(service) {
+      try {
+        switch (service) {
+          case "lastfm":
+            return await this.testLastFmConnection();
+          case "listenbrainz":
+            return await this.testListenBrainzConnection();
+          default:
+            return false;
+        }
+      } catch (error) {
+        console.error(`Error testing ${service}:`, error);
+        return false;
+      }
+    }
+    static async testLastFmConnection() {
+      const username = getStorage("username");
+      const apiKey = getStorage("apiKey");
+      if (!username || !apiKey) return false;
+      try {
+        const response = await fetch(
+          `https://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${username}&api_key=${apiKey}&format=json`
+        );
+        const data = await response.json();
+        return !data.error;
+      } catch (error) {
+        console.error("Last.fm connection test failed:", error);
+        return false;
+      }
+    }
+    static async testListenBrainzConnection() {
+      const username = getStorage("listenbrainzUsername");
+      const token = getStorage("listenbrainzToken");
+      if (!username) return false;
+      try {
+        const headers = {
+          "Content-Type": "application/json"
+        };
+        if (token) headers["Authorization"] = `Token ${token}`;
+        const response = await fetch(
+          `https://api.listenbrainz.org/1/user/${username}/listen-count`,
+          { headers }
+        );
+        return response.status === 200;
+      } catch (error) {
+        console.error("ListenBrainz connection test failed:", error);
+        return false;
+      }
+    }
+  };
+  var serviceFactory2 = ServiceFactory2;
+  function Settings() {
+    (0, import_storage8.useProxy)(import_vendetta8.plugin.storage);
+    const navigation = import_common10.NavigationNative.useNavigation();
+    const [, forceUpdate] = import_common9.React.useReducer((x) => x + 1, 0);
+    const currentService = getStorage("service");
+    const getCredentialStatus = (service) => {
+      switch (service) {
+        case "lastfm":
+          return getStorage("username") && getStorage("apiKey") ? "Configured" : "Missing credentials";
+        case "listenbrainz":
+          return getStorage("listenbrainzUsername") ? "Configured" : "Missing username";
+        default:
+          return "Unknown";
+      }
+    };
+    return /* @__PURE__ */ import_common9.React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { padding: 10 } }, /* @__PURE__ */ import_common9.React.createElement(Stack, { spacing: 8 }, /* @__PURE__ */ import_common9.React.createElement(TableRowGroup, { title: "Active Service" }, /* @__PURE__ */ import_common9.React.createElement(
+      TableRow,
+      {
+        label: "Current Service",
+        subLabel: currentService ? `Using: ${serviceFactory2.getServiceDisplayName(currentService)}` : "No service selected"
+      }
+    ), ["lastfm", "listenbrainz"].map(
+      (service) => /* @__PURE__ */ import_common9.React.createElement(
+        TableCheckboxRow,
+        {
+          key: service,
+          label: serviceFactory2.getServiceDisplayName(service),
+          subLabel: getCredentialStatus(service),
+          checked: currentService === service,
+          onPress: () => {
+            if (service !== currentService) {
+              setStorage("service", service);
+              forceUpdate();
+            }
+          }
+        }
+      )
+    )), /* @__PURE__ */ import_common9.React.createElement(TableRowGroup, { title: "Service Configuration" }, /* @__PURE__ */ import_common9.React.createElement(
+      TableRow,
+      {
+        label: "Last.fm Settings",
+        subLabel: "Configure Last.fm credentials and options",
+        trailing: /* @__PURE__ */ import_common9.React.createElement(TableRow.Arrow, null),
+        onPress: () => navigation.push("VendettaCustomPage", {
+          title: "Last.fm Settings",
+          render: LastFmSettingsPage
+        })
+      }
+    ), /* @__PURE__ */ import_common9.React.createElement(
+      TableRow,
+      {
+        label: "ListenBrainz Settings",
+        subLabel: "Configure ListenBrainz credentials and options",
+        trailing: /* @__PURE__ */ import_common9.React.createElement(TableRow.Arrow, null),
+        onPress: () => navigation.push("VendettaCustomPage", {
+          title: "ListenBrainz Settings",
+          render: ListenBrainzSettingsPage
+        })
+      }
+    )), /* @__PURE__ */ import_common9.React.createElement(TableRowGroup, { title: "Plugin Configuration" }, /* @__PURE__ */ import_common9.React.createElement(
+      TableRow,
+      {
+        label: "Display Settings",
+        subLabel: "Customize app name and update interval",
+        trailing: /* @__PURE__ */ import_common9.React.createElement(TableRow.Arrow, null),
+        onPress: () => navigation.push("VendettaCustomPage", {
+          title: "Display Settings",
+          render: DisplaySettingsPage
+        })
+      }
+    ), /* @__PURE__ */ import_common9.React.createElement(
+      TableRow,
+      {
+        label: "RPC Customization",
+        subLabel: "Customize Discord rich presence display options",
+        trailing: /* @__PURE__ */ import_common9.React.createElement(TableRow.Arrow, null),
+        onPress: () => navigation.push("VendettaCustomPage", {
+          title: "RPC Customization",
+          render: RPCCustomizationSettingsPage
+        })
+      }
+    ), /* @__PURE__ */ import_common9.React.createElement(
+      TableRow,
+      {
+        label: "Ignore List",
+        subLabel: "Configure apps that should hide your status",
+        trailing: /* @__PURE__ */ import_common9.React.createElement(TableRow.Arrow, null),
+        onPress: () => navigation.push("VendettaCustomPage", {
+          title: "Ignore List Settings",
+          render: IgnoreListSettingsPage
+        })
+      }
+    ), /* @__PURE__ */ import_common9.React.createElement(
+      TableRow,
+      {
+        label: "Logging Settings",
+        subLabel: "Configure logging and debugging options",
+        trailing: /* @__PURE__ */ import_common9.React.createElement(TableRow.Arrow, null),
+        onPress: () => navigation.push("VendettaCustomPage", {
+          title: "Logging Settings",
+          render: LoggingSettingsPage
+        })
+      }
+    ), /* @__PURE__ */ import_common9.React.createElement(
+      TableSwitchRow,
+      {
+        label: "Add to Sidebar",
+        subLabel: "Show plugin in Discord settings",
+        value: getStorage("addToSidebar", false),
+        onValueChange: (value) => {
+          setStorage("addToSidebar", value);
+          forceUpdate();
+        }
+      }
+    )), /* @__PURE__ */ import_common9.React.createElement(TableRowGroup, { title: "About" }, /* @__PURE__ */ import_common9.React.createElement(
+      TableRow,
+      {
+        label: "Multi Scrobbler",
+        subLabel: "Show off your music status from multiple services"
+      }
+    ), /* @__PURE__ */ import_common9.React.createElement(TableRow, { label: "Author", subLabel: "kmmiio99o" }), /* @__PURE__ */ import_common9.React.createElement(TableRow, { label: "Version", subLabel: "1.3.2" }))));
+  }
+
+  // src/sidebar.tsx
+  var import_vendetta9 = p;
+  var import_common11 = r;
+  var import_assets4 = re;
+  var import_patcher = k;
+  var import_components = R;
+  var import_utils = Q;
+  var import_metro3 = x;
+  var import_vendetta10 = p;
+  var { FormSection, FormRow } = import_components.Forms;
+  var { TableRowIcon } = (0, import_metro3.findByProps)("TableRowIcon");
+  var bunny = window.bunny;
+  var tabsNavigationRef = bunny?.metro?.findByPropsLazy("getRootNavigationRef");
+  var settingConstants = bunny?.metro?.findByPropsLazy(
+    "SETTING_RENDERER_CONFIG"
+  );
+  var createListModule = bunny?.metro?.findByPropsLazy("createList");
+  var SettingsOverviewScreen = bunny?.metro?.findByNameLazy(
+    "SettingsOverviewScreen",
+    false
+  );
+  function Section({ tabs }) {
+    const navigation = import_common11.NavigationNative.useNavigation();
+    return import_common11.React.createElement(FormRow, {
+      label: tabs.title(),
+      leading: import_common11.React.createElement(FormRow.Icon, { source: tabs.icon }),
+      trailing: import_common11.React.createElement(import_common11.React.Fragment, {}, [
+        tabs.trailing ? tabs.trailing() : null,
+        import_common11.React.createElement(FormRow.Arrow, { key: "arrow" })
+      ]),
+      onPress: () => {
+        const Component = tabs.page;
+        navigation.navigate("VendettaCustomPage", {
+          title: tabs.title(),
+          render: () => import_common11.React.createElement(Component)
+        });
+      }
+    });
+  }
+  function patchPanelUI(tabs, patches) {
+    try {
+      patches.push(
+        (0, import_patcher.after)(
+          "default",
+          bunny?.metro?.findByPropsLazy(["renderTitle", "sections"], false),
+          (_, ret) => {
+            const UserSettingsOverview = (0, import_utils.findInReactTree)(
+              ret.props.children,
+              (n) => n.type?.name === "UserSettingsOverview"
+            );
+            if (UserSettingsOverview) {
+              patches.push(
+                (0, import_patcher.after)(
+                  "render",
+                  UserSettingsOverview.type.prototype,
+                  (_args, res) => {
+                    const sections = (0, import_utils.findInReactTree)(
+                      res.props.children,
+                      (n) => n?.children?.[1]?.type === FormSection
+                    )?.children;
+                    if (sections) {
+                      const index = sections.findIndex(
+                        (c) => ["BILLING_SETTINGS", "PREMIUM_SETTINGS"].includes(
+                          c?.props?.label
+                        )
+                      );
+                      sections.splice(
+                        -~index || 4,
+                        0,
+                        import_common11.React.createElement(Section, { key: tabs.key, tabs })
+                      );
+                    }
+                  }
+                )
+              );
+            }
+          },
+          true
+        )
+      );
+    } catch (error) {
+      import_vendetta10.logger.info("Panel UI patch failed graciously \u{1F494}", error);
+    }
+  }
+  function patchTabsUI(tabs, patches) {
+    if (!settingConstants || !tabsNavigationRef) {
+      console.warn("[RPC] Missing required constants for tabs UI patch");
+      return;
+    }
+    const row = {
+      [tabs.key]: {
+        type: "pressable",
+        useTitle: tabs.title,
+        title: tabs.title,
+        icon: tabs.icon,
+        IconComponent: tabs.icon && (() => import_common11.React.createElement(TableRowIcon, { source: tabs.icon })),
+        usePredicate: tabs.predicate,
+        useTrailing: tabs.trailing,
+        onPress: () => {
+          const navigation = tabsNavigationRef.getRootNavigationRef();
+          const Component = tabs.page;
+          navigation.navigate("VendettaCustomPage", {
+            title: tabs.title(),
+            render: () => import_common11.React.createElement(Component)
+          });
+        },
+        withArrow: true
+      }
+    };
+    let rendererConfigValue = settingConstants.SETTING_RENDERER_CONFIG;
+    Object.defineProperty(settingConstants, "SETTING_RENDERER_CONFIG", {
+      enumerable: true,
+      configurable: true,
+      get: () => ({
+        ...rendererConfigValue,
+        ...row
+      }),
+      set: (v) => rendererConfigValue = v
+    });
+    const firstRender = /* @__PURE__ */ Symbol("pinToSettings meow meow");
+    try {
+      if (!createListModule) return;
+      patches.push(
+        (0, import_patcher.after)("createList", createListModule, function(args, ret) {
+          if (!args[0][firstRender]) {
+            args[0][firstRender] = true;
+            const [config] = args;
+            const sections = config.sections;
+            const section = sections?.find(
+              (x) => ["Bunny", "Revenge", "Kettu", "Vencore", "ShiggyCord"].some(
+                (mod) => x.label === mod && x.title === mod
+              )
+            );
+            if (section?.settings) {
+              section.settings = [...section.settings, tabs.key];
+            }
+          }
+        })
+      );
+    } catch {
+      if (!SettingsOverviewScreen) return;
+      patches.push(
+        (0, import_patcher.after)("default", SettingsOverviewScreen, (args, ret) => {
+          if (!args[0][firstRender]) {
+            args[0][firstRender] = true;
+            const { sections } = (0, import_utils.findInReactTree)(
+              ret,
+              (i) => i.props?.sections
+            ).props;
+            const section = sections?.find(
+              (x) => ["Bunny", "Revenge", "Kettu", "Vencore", "ShiggyCord"].some(
+                (mod) => x.label === mod && x.title === mod
+              )
+            );
+            if (section?.settings) {
+              section.settings = [...section.settings, tabs.key];
+            }
+          }
+        })
+      );
+    }
+  }
+  function patchSettingsPin(tabs) {
+    const patches = [];
+    let disabled = false;
+    const realPredicate = tabs.predicate || (() => true);
+    tabs.predicate = () => disabled ? false : realPredicate();
+    patchPanelUI(tabs, patches);
+    patchTabsUI(tabs, patches);
+    patches.push(() => disabled = true);
+    return () => {
+      for (const x of patches) {
+        x();
+      }
+    };
+  }
+  function patchSidebar() {
+    if (!import_vendetta9.plugin.storage.addToSidebar) {
+      console.log("[RPC] Sidebar disabled in settings");
+      return () => {
+      };
+    }
+    console.log(
+      "[RPC] Patching sidebar using custom patchSettingsPin..."
+    );
+    try {
+      const unpatch = patchSettingsPin({
+        key: "MultiScrobbler",
+        icon: (0, import_assets4.getAssetIDByName)("MusicIcon"),
+        title: () => "RPC",
+        predicate: () => import_vendetta9.plugin.storage.addToSidebar === true,
+        page: Settings
+      });
+      console.log("[RPC] Successfully patched sidebar");
+      return unpatch;
+    } catch (error) {
+      console.error("[RPC] Failed to patch sidebar:", error);
+      return () => {
+      };
+    }
+  }
+
+  // src/index.tsx
+  var pluginState = {
+    pluginStopped: false,
+    lastActivity: void 0,
+    updateInterval: void 0,
+    lastTrackUrl: void 0
+  };
+  var sidebarUnpatch;
+  var defaultSettings = constants_default.DEFAULT_SETTINGS;
+  Object.keys(defaultSettings).forEach((key) => {
+    import_vendetta11.plugin.storage[key] = import_vendetta11.plugin.storage[key] ?? defaultSettings[key];
+  });
+  import_vendetta11.plugin.storage.addToSidebar ??= false;
+  var currentSettings = new Proxy(import_vendetta11.plugin.storage, {
+    get(target, prop) {
+      return target[prop];
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      return true;
+    }
+  });
+  var connectionAttempts = 0;
+  var MAX_CONNECTION_ATTEMPTS = 3;
+  var RECONNECT_DELAY = 5e3;
+  async function tryInitialize() {
+    try {
+      await initialize();
+      connectionAttempts = 0;
+      console.log("[RPC] Successfully connected");
+    } catch (error) {
+      console.error("[RPC] Initialization error:", error);
+      connectionAttempts++;
+      if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
+        console.log(
+          `[RPC] Retrying connection... (attempt ${connectionAttempts})`
+        );
+        setTimeout(tryInitialize, RECONNECT_DELAY);
+      } else {
+        console.error(
+          "[RPC] Failed to connect after multiple attempts"
+        );
+      }
+    }
+  }
+  async function validateAndInitialize() {
+    if (!currentSettings.service) {
+      console.log("[RPC] No service selected. Please configure a service in settings.");
+      return;
+    }
+    let serviceName = "Unknown";
+    try {
+      serviceName = serviceFactory.getCurrentService().getServiceName();
+    } catch (e) {
+      console.error("[RPC] Failed to determine current service name:", e);
+    }
+    const service = currentSettings.service;
+    let hasCredentials = false;
+    switch (service) {
+      case "lastfm":
+        hasCredentials = !!(currentSettings.username && currentSettings.apiKey);
+        break;
+      case "listenbrainz":
+        hasCredentials = !!currentSettings.listenbrainzUsername;
+        break;
+    }
+    if (!hasCredentials) {
+      console.error(`[RPC] Missing credentials for ${serviceName}. Please configure in settings.`);
+      return;
+    }
+    console.log(`[RPC] Starting with ${serviceName}...`);
+    if (UserStore.getCurrentUser()) {
+      tryInitialize();
+    } else {
+      const waitForUser = () => {
+        if (UserStore.getCurrentUser()) {
+          tryInitialize();
+          import_common12.FluxDispatcher.unsubscribe("CONNECTION_OPEN", waitForUser);
+        }
+      };
+      import_common12.FluxDispatcher.subscribe("CONNECTION_OPEN", waitForUser);
+    }
+  }
+  var index_default = {
+    onLoad() {
+      console.log("[RPC] Loading...");
+      pluginState.pluginStopped = false;
+      if (currentSettings.addToSidebar !== false) {
+        try {
+          sidebarUnpatch = patchSidebar();
+          console.log("[RPC] Sidebar patched successfully");
+        } catch (error) {
+          console.error("[RPC] Failed to patch sidebar:", error);
+        }
+      }
+      validateAndInitialize();
+    },
+    onUnload() {
+      console.log("[RPC] Unloading...");
+      pluginState.pluginStopped = true;
+      if (sidebarUnpatch) {
+        try {
+          sidebarUnpatch();
+          sidebarUnpatch = void 0;
+          console.log("[RPC] Sidebar unpatched");
+        } catch (error) {
+          console.error("[RPC] Failed to unpatch sidebar:", error);
+        }
+      }
+      stop();
+    },
+    async onSettingsUpdate(newSettings) {
+      const oldService = currentSettings.service;
+      const newService = newSettings.service;
+      const oldSidebar = currentSettings.addToSidebar;
+      const newSidebar = newSettings.addToSidebar;
+      Object.assign(currentSettings, newSettings);
+      if (oldSidebar !== newSidebar) {
+        if (newSidebar) {
+          try {
+            sidebarUnpatch = patchSidebar();
+            console.log("[RPC] Sidebar enabled");
+          } catch (error) {
+            console.error("[RPC] Failed to enable sidebar:", error);
+          }
+        } else {
+          if (sidebarUnpatch) {
+            try {
+              sidebarUnpatch();
+            } catch (e) {
+              console.error("[RPC] Failed to unpatch sidebar:", e);
+            }
+            sidebarUnpatch = void 0;
+            console.log("[RPC] Sidebar disabled");
+          }
+        }
+      }
+      if (oldService !== newService && newService) {
+        console.log(`[RPC] Service changed from ${oldService || "none"} to ${newService}`);
+        try {
+          await switchService(newService);
+        } catch (e) {
+          console.error("[RPC] Failed to switch service:", e);
+        }
+      } else if (!pluginState.pluginStopped && currentSettings.service) {
+        tryInitialize();
+      } else if (!currentSettings.service) {
+        console.log("[RPC] Service unselected, stopping plugin...");
+        try {
+          stop();
+        } catch (e) {
+          console.error("[RPC] Error while stopping due to service unselected:", e);
+        }
+      }
+    },
+    onDiscordReconnect() {
+      if (!pluginState.pluginStopped) {
+        console.log("[RPC] Discord reconnected, reinitializing...");
+        tryInitialize();
+      }
+    },
+    settings: Settings
+  };
+})();
+return Y.default=Y,Y})({},vendetta,vendetta.metro.common,vendetta.metro,window.React,vendetta.storage,vendetta.metro.common.ReactNative,vendetta.ui.toasts,vendetta.ui.assets,vendetta.patcher,vendetta.ui.components,vendetta.utils);
