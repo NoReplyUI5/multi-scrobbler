@@ -7,8 +7,6 @@ const Constants = {
     APPLICATION_ID: "1368513179272871956",
     // Don't check more than once every 3 seconds to avoid getting rate limited
     MIN_UPDATE_INTERVAL: 3,
-    // Libre.fm specifically requested a 1-minute minimum to reduce load
-    LIBREFM_MIN_UPDATE_INTERVAL: 60,
     // How many times to retry failed API calls
     MAX_RETRY_ATTEMPTS: 3,
     // Wait 5 seconds between retries
@@ -16,18 +14,6 @@ const Constants = {
 
     // Configuration for each supported service
     SERVICES: {
-        lastfm: {
-            name: "Last.fm",
-            baseUrl: "https://ws.audioscrobbler.com/2.0",
-            requiresApiKey: true,
-            requiresToken: false,
-        },
-        librefm: {
-            name: "Libre.fm",
-            baseUrl: "https://libre.fm/2.0",
-            requiresApiKey: true,
-            requiresToken: false,
-        },
         listenbrainz: {
             name: "ListenBrainz",
             baseUrl: "https://api.listenbrainz.org/1",
@@ -40,7 +26,7 @@ const Constants = {
     // environment or build details; the runtime should manage safe headers.
     DEFAULT_HEADERS: {} as Record<string, string>,
 
-    // Last.fm/Libre.fm use these hashes for their generic album covers
+    // Default album cover hashes
     DEFAULT_COVER_HASHES: ["2a96cbd8b46e442fc41c2b86b821562f"],
 
     // Plugin defaults
@@ -55,13 +41,11 @@ const Constants = {
         ignoreYouTubeMusic: false,
         verboseLogging: false,
         service: undefined as ServiceType | undefined,
-        librefmUsername: "",
-        librefmApiKey: "",
         listenbrainzUsername: "",
         listenbrainzToken: "",
     },
 
-    // Last.fm/Libre.fm API error codes
+    // ListenBrainz API error codes
     API_ERROR_CODES: {
         2: "Invalid service",
         3: "Invalid method",

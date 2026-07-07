@@ -98,7 +98,7 @@ function patchPanelUI(tabs, patches) {
 
 function patchTabsUI(tabs, patches) {
     if (!settingConstants || !tabsNavigationRef) {
-        console.warn("[LastFm] Missing required constants for tabs UI patch");
+        console.warn("[Multi Scrobbler] Missing required constants for tabs UI patch");
         return;
     }
 
@@ -220,7 +220,7 @@ export default function patchSidebar() {
 
     try {
         const unpatch = patchSettingsPin({
-            key: "LastFmScrobbler",
+            key: "MultiScrobbler",
             icon: getAssetIDByName("MusicIcon"),
             title: () => "Multi Scrobbler",
             predicate: () => plugin.storage.addToSidebar === true,

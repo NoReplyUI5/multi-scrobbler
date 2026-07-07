@@ -7,13 +7,10 @@ import {
     TableRowGroup,
     TableRow,
     TableSwitchRow,
-    TableCheckboxRow,
     ScrollView,
 } from "./pages/components/TableComponents";
 
 // Import pages
-import LastFmSettingsPage from "./pages/LastFmSettingsPage";
-import LibreFmSettingsPage from "./pages/LibreFmSettingsPage";
 import ListenBrainzSettingsPage from "./pages/ListenBrainzSettingsPage";
 import DisplaySettingsPage from "./pages/DisplaySettingsPage";
 import RPCCustomizationSettingsPage from "./pages/RPCCustomizationSettingsPage";
@@ -30,9 +27,7 @@ plugin.storage.timeInterval ??= 5;
 plugin.storage.showTimestamp ??= true;
 plugin.storage.listeningTo ??= true;
 plugin.storage.verboseLogging ??= false;
-plugin.storage.service ??= "lastfm";
-plugin.storage.librefmUsername ??= "";
-plugin.storage.librefmApiKey ??= "";
+plugin.storage.service ??= "listenbrainz";
 plugin.storage.listenbrainzUsername ??= "";
 plugin.storage.listenbrainzToken ??= "";
 plugin.storage.addToSidebar ??= true;
@@ -49,10 +44,6 @@ export const setStorage = (k: string, v: any) => (plugin.storage[k] = v);
 class ServiceFactory {
     static getServiceDisplayName(service: ServiceType): string {
         switch (service) {
-            case "lastfm":
-                return "Last.fm";
-            case "librefm":
-                return "Libre.fm";
             case "listenbrainz":
                 return "ListenBrainz";
             default:
@@ -63,10 +54,6 @@ class ServiceFactory {
     static async testService(service: ServiceType): Promise<boolean> {
         try {
             switch (service) {
-                case "lastfm":
-                    return await this.testLastFmConnection();
-                case "librefm":
-                    return await this.testLibreFmConnection();
                 case "listenbrainz":
                     return await this.testListenBrainzConnection();
                 default:
@@ -74,38 +61,6 @@ class ServiceFactory {
             }
         } catch (error) {
             console.error(`Error testing ${service}:`, error);
-            return false;
-        }
-    }
-
-    private static async testLastFmConnection(): Promise<boolean> {
-        const username = getStorage("username");
-        const apiKey = getStorage("apiKey");
-        if (!username || !apiKey) return false;
-        try {
-            const response = await fetch(
-                `https://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${username}&api_key=${apiKey}&format=json`,
-            );
-            const data = await response.json();
-            return !data.error;
-        } catch (error) {
-            console.error("Last.fm connection test failed:", error);
-            return false;
-        }
-    }
-
-    private static async testLibreFmConnection(): Promise<boolean> {
-        const username = getStorage("librefmUsername");
-        const apiKey = getStorage("librefmApiKey");
-        if (!username || !apiKey) return false;
-        try {
-            const response = await fetch(
-                `https://libre.fm/2.0/?method=user.getinfo&user=${username}&api_key=${apiKey}&format=json`,
-            );
-            const data = await response.json();
-            return !data.error;
-        } catch (error) {
-            console.error("Libre.fm connection test failed:", error);
             return false;
         }
     }
@@ -142,79 +97,23 @@ export default function Settings() {
 
     const getCredentialStatus = (service: ServiceType) => {
         switch (service) {
-            case "lastfm":
-                return getStorage("username") && getStorage("apiKey")
-                    ? "✅ Configured"
-                    : "❌ Missing credentials";
-            case "librefm":
-                return getStorage("librefmUsername") && getStorage("librefmApiKey")
-                    ? "✅ Configured"
-                    : "❌ Missing credentials";
             case "listenbrainz":
                 return getStorage("listenbrainzUsername")
-                    ? "✅ Configured"
-                    : "❌ Missing username";
+                    ? "Configured"
+                    : "Missing username";
             default:
-                return "❓ Unknown";
+                return "Unknown";
         }
     };
 
     return (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 10 }}>
             <Stack spacing={8}>
-                {/* Service Selection */}
-                <TableRowGroup title="Active Service">
-                    <TableRow
-                        label="Current Service"
-                        subLabel={
-                            currentService
-                                ? `Using: ${serviceFactory.getServiceDisplayName(currentService)}`
-                                : "No service selected"
-                        }
-                    />
-                    {(["lastfm", "librefm", "listenbrainz"] as ServiceType[]).map(
-                        (service) => (
-                            <TableCheckboxRow
-                                key={service}
-                                label={serviceFactory.getServiceDisplayName(service)}
-                                subLabel={getCredentialStatus(service)}
-                                // Single choice logic: check if this matches current service
-                                checked={currentService === service}
-                                onPress={() => {
-                                    // Only update if clicking a service that isn't already selected
-                                    if (service !== currentService) {
-                                        setStorage("service", service);
-                                        forceUpdate();
-                                    }
-                                }}
-                            />
-                        ),
-                    )}
-                </TableRowGroup>
-
                 {/* Service Configuration */}
                 <TableRowGroup title="Service Configuration">
                     <TableRow
-                        label="Last.fm Settings"
-                        subLabel="Configure Last.fm credentials and options"
-                        trailing={<TableRow.Arrow />}
-                        onPress={() =>
-                            navigation.push("VendettaCustomPage", {
-                                title: "Last.fm Settings",
-                                render: LastFmSettingsPage,
-                            })
-                        }
-                    />
-                    <TableRow
-                        label="Libre.fm Settings"
-                        subLabel="Configure Libre.fm credentials and options"
-                        trailing={<TableRow.Arrow />}
-                        onPress={() =>
-                            navigation.push("VendettaCustomPage", {
-                                title: "Libre.fm Settings",
-                                render: LibreFmSettingsPage,
-                            })
-                        }
+                        label="Current Service"
+                        subLabel={serviceFactory.getServiceDisplayName(currentService)}
                     />
                     <TableRow
                         label="ListenBrainz Settings"
@@ -290,7 +189,7 @@ export default function Settings() {
                 <TableRowGroup title="About">
                     <TableRow
                         label="Multi Scrobbler"
-                        subLabel="Show off your music status from multiple services"
+                        subLabel="Show off your music status from ListenBrainz on Discord"
                     />
                     <TableRow label="Author" subLabel="kmmiio99o" />
                     <TableRow label="Version" subLabel="1.3.2" />
