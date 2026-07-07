@@ -7,8 +7,9 @@
       "id": "879393496627306587"
     }
   ],
-  "main": "src/index.tsx",
+  "main": "index.js",
   "vendetta": {
     "icon": "ic_stage_music"
-  }
+  },
+  "hash": "e8e91a0e43a5dd61a9b59cafeee222a3d03d3aac3a5cac5659919046914f1830"
 }
