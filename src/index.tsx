@@ -87,6 +87,9 @@ async function validateAndInitialize() {
     let hasCredentials = false;
 
     switch (service) {
+        case "lastfm":
+            hasCredentials = !!(currentSettings.username && currentSettings.apiKey);
+            break;
         case "listenbrainz":
             hasCredentials = !!currentSettings.listenbrainzUsername;
             break;

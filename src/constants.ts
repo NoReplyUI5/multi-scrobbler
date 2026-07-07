@@ -14,6 +14,12 @@ const Constants = {
 
     // Configuration for each supported service
     SERVICES: {
+        lastfm: {
+            name: "Last.fm",
+            baseUrl: "https://ws.audioscrobbler.com/2.0",
+            requiresApiKey: true,
+            requiresToken: false,
+        },
         listenbrainz: {
             name: "ListenBrainz",
             baseUrl: "https://api.listenbrainz.org/1",

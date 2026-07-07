@@ -29,10 +29,11 @@ const debugInfo = {} as {
 debugInfo.componentMountErrors = [];
 debugInfo.componentMountCount = 0;
 debugInfo.settingsLoadAttempts = 0;
-debugInfo.serviceErrors = { listenbrainz: [] };
+debugInfo.serviceErrors = { lastfm: [], listenbrainz: [] };
 debugInfo.apiCallCount = 0;
 debugInfo.connectionAttempts = 0;
 debugInfo.lastCredentialValidation = {
+    lastfm: false,
     listenbrainz: false,
 };
 
@@ -67,6 +68,7 @@ export function incrementApiCall() {
 
 export function recordServiceError(service: ServiceType, error: string) {
     debugInfo.serviceErrors = debugInfo.serviceErrors || {
+        lastfm: [],
         listenbrainz: [],
     };
     debugInfo.serviceErrors[service] = debugInfo.serviceErrors[service] || [];
@@ -89,6 +91,7 @@ export function recordCredentialValidation(
     isValid: boolean,
 ) {
     debugInfo.lastCredentialValidation = debugInfo.lastCredentialValidation || {
+        lastfm: false,
         listenbrainz: false,
     };
     debugInfo.lastCredentialValidation[service] = isValid;

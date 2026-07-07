@@ -79,6 +79,8 @@ export default function RPCPreview() {
                         : 180;
 
                     let image: string | null = null;
+
+                    // Try Cover Art Archive first
                     if (meta.additional_info?.release_mbid) {
                         try {
                             const coverUrl = `https://coverartarchive.org/release/${meta.additional_info.release_mbid}/front`;
@@ -87,6 +89,28 @@ export default function RPCPreview() {
                                 redirect: "follow",
                             });
                             if (coverRes.ok) image = coverUrl;
+                        } catch (e) {
+                            // ignore
+                        }
+                    }
+
+                    // Fallback to Last.fm for image if available
+                    if (!image && getStorage("username") && getStorage("apiKey")) {
+                        try {
+                            const lfmRes = await fetch(
+                                `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${getStorage("apiKey")}&artist=${encodeURIComponent(meta.artist_name)}&track=${encodeURIComponent(meta.track_name)}&format=json`,
+                            );
+                            const lfmData = await lfmRes.json();
+                            const images = lfmData?.track?.album?.image;
+                            if (images && images.length > 0) {
+                                // Get the largest image (last in array)
+                                for (let i = images.length - 1; i >= 0; i--) {
+                                    if (images[i]["#text"]) {
+                                        image = images[i]["#text"];
+                                        break;
+                                    }
+                                }
+                            }
                         } catch (e) {
                             // ignore
                         }

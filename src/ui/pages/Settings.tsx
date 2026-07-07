@@ -6,11 +6,13 @@ import {
     Stack,
     TableRowGroup,
     TableRow,
+    TableCheckboxRow,
     TableSwitchRow,
     ScrollView,
 } from "./pages/components/TableComponents";
 
 // Import pages
+import LastFmSettingsPage from "./pages/LastFmSettingsPage";
 import ListenBrainzSettingsPage from "./pages/ListenBrainzSettingsPage";
 import DisplaySettingsPage from "./pages/DisplaySettingsPage";
 import RPCCustomizationSettingsPage from "./pages/RPCCustomizationSettingsPage";
@@ -44,6 +46,8 @@ export const setStorage = (k: string, v: any) => (plugin.storage[k] = v);
 class ServiceFactory {
     static getServiceDisplayName(service: ServiceType): string {
         switch (service) {
+            case "lastfm":
+                return "Last.fm";
             case "listenbrainz":
                 return "ListenBrainz";
             default:
@@ -54,6 +58,8 @@ class ServiceFactory {
     static async testService(service: ServiceType): Promise<boolean> {
         try {
             switch (service) {
+                case "lastfm":
+                    return await this.testLastFmConnection();
                 case "listenbrainz":
                     return await this.testListenBrainzConnection();
                 default:
@@ -61,6 +67,22 @@ class ServiceFactory {
             }
         } catch (error) {
             console.error(`Error testing ${service}:`, error);
+            return false;
+        }
+    }
+
+    private static async testLastFmConnection(): Promise<boolean> {
+        const username = getStorage("username");
+        const apiKey = getStorage("apiKey");
+        if (!username || !apiKey) return false;
+        try {
+            const response = await fetch(
+                `https://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${username}&api_key=${apiKey}&format=json`,
+            );
+            const data = await response.json();
+            return !data.error;
+        } catch (error) {
+            console.error("Last.fm connection test failed:", error);
             return false;
         }
     }
@@ -97,6 +119,10 @@ export default function Settings() {
 
     const getCredentialStatus = (service: ServiceType) => {
         switch (service) {
+            case "lastfm":
+                return getStorage("username") && getStorage("apiKey")
+                    ? "Configured"
+                    : "Missing credentials";
             case "listenbrainz":
                 return getStorage("listenbrainzUsername")
                     ? "Configured"
@@ -109,11 +135,46 @@ export default function Settings() {
     return (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 10 }}>
             <Stack spacing={8}>
+                {/* Service Selection */}
+                <TableRowGroup title="Active Service">
+                    <TableRow
+                        label="Current Service"
+                        subLabel={
+                            currentService
+                                ? `Using: ${serviceFactory.getServiceDisplayName(currentService)}`
+                                : "No service selected"
+                        }
+                    />
+                    {(["lastfm", "listenbrainz"] as ServiceType[]).map(
+                        (service) => (
+                            <TableCheckboxRow
+                                key={service}
+                                label={serviceFactory.getServiceDisplayName(service)}
+                                subLabel={getCredentialStatus(service)}
+                                checked={currentService === service}
+                                onPress={() => {
+                                    if (service !== currentService) {
+                                        setStorage("service", service);
+                                        forceUpdate();
+                                    }
+                                }}
+                            />
+                        ),
+                    )}
+                </TableRowGroup>
+
                 {/* Service Configuration */}
                 <TableRowGroup title="Service Configuration">
                     <TableRow
-                        label="Current Service"
-                        subLabel={serviceFactory.getServiceDisplayName(currentService)}
+                        label="Last.fm Settings"
+                        subLabel="Configure Last.fm credentials and options"
+                        trailing={<TableRow.Arrow />}
+                        onPress={() =>
+                            navigation.push("VendettaCustomPage", {
+                                title: "Last.fm Settings",
+                                render: LastFmSettingsPage,
+                            })
+                        }
                     />
                     <TableRow
                         label="ListenBrainz Settings"
@@ -189,7 +250,7 @@ export default function Settings() {
                 <TableRowGroup title="About">
                     <TableRow
                         label="Multi Scrobbler"
-                        subLabel="Show off your music status from ListenBrainz on Discord"
+                        subLabel="Show off your music status from multiple services"
                     />
                     <TableRow label="Author" subLabel="kmmiio99o" />
                     <TableRow label="Version" subLabel="1.3.2" />

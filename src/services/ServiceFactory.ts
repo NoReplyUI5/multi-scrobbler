@@ -1,5 +1,6 @@
 import { ServiceClient, ServiceType } from "../../../defs";
 import { currentSettings } from "..";
+import { LastFmService } from "./LastFmService";
 import { ListenBrainzService } from "./ListenBrainzService";
 
 export class ServiceFactory {
@@ -45,6 +46,8 @@ export class ServiceFactory {
 
     private createService(serviceType: ServiceType): ServiceClient {
         switch (serviceType) {
+            case "lastfm":
+                return new LastFmService();
             case "listenbrainz":
                 return new ListenBrainzService();
             default:
@@ -77,7 +80,7 @@ export class ServiceFactory {
     }
 
     public getSupportedServices(): ServiceType[] {
-        return ["listenbrainz"];
+        return ["lastfm", "listenbrainz"];
     }
 
     public getServiceDisplayName(serviceType: ServiceType): string {
