@@ -1,5 +1,73 @@
-(function(Y,p,r,x,Pt,D,re,k,R,Q,Qe,ne){
-    var constants_default = Constants;
+(function(Y,p,r,x,Pt,D,re,k,R,Q,Qe,ne){// src/index.tsx
+  var import_vendetta11 = p;
+  var import_common12 = r;
+
+  // src/constants.ts
+  var Constants = {
+    DEFAULT_APP_NAME: "Music",
+    DEFAULT_TIME_INTERVAL: 5,
+    // Discord application ID
+    APPLICATION_ID: "1368513179272871956",
+    // Don't check more than once every 3 seconds to avoid getting rate limited
+    MIN_UPDATE_INTERVAL: 3,
+    // How many times to retry failed API calls
+    MAX_RETRY_ATTEMPTS: 3,
+    // Wait 5 seconds between retries
+    RETRY_DELAY: 5e3,
+    // Configuration for each supported service
+    SERVICES: {
+      lastfm: {
+        name: "Last.fm",
+        baseUrl: "https://ws.audioscrobbler.com/2.0",
+        requiresApiKey: true,
+        requiresToken: false
+      },
+      listenbrainz: {
+        name: "ListenBrainz",
+        baseUrl: "https://api.listenbrainz.org/1",
+        requiresApiKey: true,
+        requiresToken: true
+      }
+    },
+    // Default request headers. Avoid setting a custom User-Agent here to prevent exposing
+    // environment or build details; the runtime should manage safe headers.
+    DEFAULT_HEADERS: {},
+    // Default album cover hashes
+    DEFAULT_COVER_HASHES: ["2a96cbd8b46e442fc41c2b86b821562f"],
+    // Plugin defaults
+    DEFAULT_SETTINGS: {
+      username: "",
+      apiKey: "",
+      appName: "Music",
+      timeInterval: 5,
+      showTimestamp: true,
+      listeningTo: true,
+      showLargeText: true,
+      ignoreYouTubeMusic: false,
+      verboseLogging: false,
+      service: void 0,
+      listenbrainzUsername: "",
+      listenbrainzToken: ""
+    },
+    // ListenBrainz API error codes
+    API_ERROR_CODES: {
+      2: "Invalid service",
+      3: "Invalid method",
+      4: "Invalid format",
+      5: "Invalid parameters",
+      6: "Invalid resource specified",
+      7: "Invalid session key",
+      8: "Invalid API key",
+      9: "Invalid session",
+      10: "Invalid API signature",
+      11: "Service offline",
+      13: "Invalid method signature supplied",
+      16: "Service temporarily unavailable",
+      26: "Suspended API key",
+      29: "Rate limit exceeded"
+    }
+  };
+  var constants_default = Constants;
 
   // src/modules.ts
   var import_metro = x;
@@ -2279,6 +2347,4 @@
       }
     },
     settings: Settings
-  };
-})();
-return Y.default=Y,Y})({},vendetta,vendetta.metro.common,vendetta.metro,window.React,vendetta.storage,vendetta.metro.common.ReactNative,vendetta.ui.toasts,vendetta.ui.assets,vendetta.patcher,vendetta.ui.components,vendetta.utils);
+  };return Y.default=Y,Y})({},vendetta,vendetta.metro.common,vendetta.metro,window.React,vendetta.storage,vendetta.metro.common.ReactNative,vendetta.ui.toasts,vendetta.ui.assets,vendetta.patcher,vendetta.ui.components,vendetta.utils);
