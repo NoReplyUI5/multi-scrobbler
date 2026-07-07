@@ -678,9 +678,16 @@
           });
         }
         if (lastTrack.album || lastTrack.albumArt) {
-          const assetUrls = lastTrack.albumArt ? [lastTrack.albumArt] : [];
-          const assets = await fetchAsset(assetUrls);
-          let largeImageAsset = assets[0];
+          let largeImageAsset = lastTrack.albumArt || null;
+          if (largeImageAsset) {
+            try {
+              const assets = await fetchAsset([largeImageAsset]);
+              if (assets?.[0]) {
+                largeImageAsset = assets[0];
+              }
+            } catch (e) {
+            }
+          }
           if (largeImageAsset) {
             activity.assets = {
               large_image: largeImageAsset
