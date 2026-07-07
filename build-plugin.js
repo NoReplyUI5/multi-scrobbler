@@ -1,7 +1,6 @@
 const esbuild = require('esbuild');
 const fs = require('fs');
 
-// Map of module imports to Vendetta globals
 const vendettaModules = {
   '@vendetta': 'vendetta',
   '@vendetta/metro/common': 'vendetta.metro.common',
@@ -16,27 +15,18 @@ const vendettaModules = {
   'react-native': 'vendetta.metro.common.ReactNative',
 };
 
-// Vendetta format: (function(Y,p,r,x,Pt,D,re,k,R,Q,Qe,ne){...})({},vendetta,...);
 const paramOrder = ['Y', 'p', 'r', 'x', 'Pt', 'D', 're', 'k', 'R', 'Q', 'Qe', 'ne'];
 const argOrder = [
-  '{}',                    // Y = exports
-  'vendetta',              // p = @vendetta
-  'vendetta.metro.common', // r = @vendetta/metro/common
-  'vendetta.metro',        // x = @vendetta/metro
-  'window.React',          // Pt = react
-  'vendetta.storage',      // D = @vendetta/storage
-  'vendetta.metro.common.ReactNative', // re = react-native
-  'vendetta.ui.toasts',    // k = @vendetta/ui/toasts
-  'vendetta.ui.assets',    // R = @vendetta/ui/assets
-  'vendetta.patcher',      // Q = @vendetta/patcher
-  'vendetta.ui.components',// Qe = @vendetta/ui/components
-  'vendetta.utils',        // ne = @vendetta/utils
+  '{}', 'vendetta', 'vendetta.metro.common', 'vendetta.metro',
+  'window.React', 'vendetta.storage', 'vendetta.metro.common.ReactNative',
+  'vendetta.ui.toasts', 'vendetta.ui.assets', 'vendetta.patcher',
+  'vendetta.ui.components', 'vendetta.utils',
 ];
 
 const importMap = {};
 const importKeys = Object.keys(vendettaModules);
 for (let i = 0; i < importKeys.length; i++) {
-  importMap[importKeys[i]] = paramOrder[i + 1]; // +1 because Y={} is exports
+  importMap[importKeys[i]] = paramOrder[i + 1];
 }
 
 async function build() {
@@ -51,6 +41,9 @@ async function build() {
 
   let code = result.outputFiles[0].text;
 
+  // Remove the __require shim (everything up to the first blank line after it)
+  code = code.replace(/var __require =[\s\S]*?\n\n/, '\n');
+
   // Replace require() calls with Vendetta module references
   for (const [imp, param] of Object.entries(importMap)) {
     const re1 = new RegExp('__require\\("' + imp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"\\)', 'g');
@@ -59,12 +52,10 @@ async function build() {
     code = code.replace(re2, param);
   }
 
-  // Remove the __require shim
-  code = code.replace(/var __require =[\s\S]*?};\n/, '');
-
-  // Wrap in Vendetta format: (function(Y,p,...){...})({},vendetta,...);
-  const body = code.replace(/^\(\(\) => \{/, '').replace(/\}\)\(\);?$/, '');
-  const wrapped = '(function(' + paramOrder.join(',') + '){' + body + 'return Y.default=Y,Y})(' + argOrder.join(',') + ');';
+  // Remove the IIFE wrapper and rewrap with Vendetta format
+  code = code.replace(/^\(\(\) => \{/, '').replace(/\}\)\(\);?\s*$/, '');
+  const body = code.trim();
+  const wrapped = '(function(' + paramOrder.join(',') + '){"use strict";' + body + 'return Y.default=Y,Y})(' + argOrder.join(',') + ');';
 
   fs.mkdirSync('multi-scrobbler', { recursive: true });
   fs.writeFileSync('multi-scrobbler/index.js', wrapped);
